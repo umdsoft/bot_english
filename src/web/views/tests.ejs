@@ -1,0 +1,42 @@
+<% layout('layout') -%>
+<div class="flex items-center justify-between mb-5">
+  <h1 class="text-2xl font-semibold">Testlar</h1>
+  <a href="/admin/tests/new" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 text-white px-4 py-2">
+    ➕ Yangi test
+  </a>
+</div>
+
+<div class="overflow-hidden rounded-xl border bg-white">
+  <table class="min-w-full divide-y">
+    <thead class="bg-gray-50 text-gray-600 text-sm">
+      <tr>
+        <th class="px-4 py-2 text-left">ID</th>
+        <th class="px-4 py-2 text-left">Code</th>
+        <th class="px-4 py-2 text-left">Nomi</th>
+        <th class="px-4 py-2 text-left">Cat</th>
+        <th class="px-4 py-2 text-left">Audience</th>
+        <th class="px-4 py-2 text-left">Active</th>
+        <th class="px-4 py-2"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y">
+      <% tests.forEach(t => { %>
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2"><%= t.id %></td>
+          <td class="px-4 py-2"><code class="text-xs bg-gray-100 px-2 py-1 rounded"><%= t.code %></code></td>
+          <td class="px-4 py-2"><%= t.name %></td>
+          <td class="px-4 py-2"><%= t.category %></td>
+          <td class="px-4 py-2"><%= t.audience %></td>
+          <td class="px-4 py-2"><%= t.is_active ? '✅' : '—' %></td>
+          <td class="px-4 py-2 text-right space-x-3">
+            <a class="text-indigo-600 hover:underline" href="/admin/tests/<%= t.id %>/edit">Tahrirlash</a>
+            <a class="text-gray-700 hover:underline" href="/admin/tests/<%= t.id %>/questions">Savollar</a>
+            <form class="inline" method="post" action="/admin/tests/<%= t.id %>/delete" onsubmit="return confirm('O‘chirish?')">
+              <button class="text-rose-600 hover:underline">O‘chirish</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>

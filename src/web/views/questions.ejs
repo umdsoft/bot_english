@@ -1,0 +1,28 @@
+<% layout('layout') -%>
+<h1 class="text-2xl font-semibold mb-2">“<%= test.name %>” — Savollar</h1>
+<p class="text-sm text-gray-600 mb-4">
+  CSV import: Har qatorda: <code class="bg-gray-100 px-1 rounded">sort_order,question_text,option1,is_correct1,option2,is_correct2,...</code>
+</p>
+
+<form method="post" action="/admin/tests/<%= test.id %>/questions/upload" enctype="multipart/form-data"
+      class="rounded-xl border bg-white p-4 mb-5 space-y-3">
+  <input type="file" name="csv" accept=".csv"
+         class="block w-full rounded-lg border px-3 py-2" required />
+  <button class="rounded-lg bg-indigo-600 text-white px-4 py-2">Yuklash</button>
+</form>
+
+<div class="overflow-hidden rounded-xl border bg-white">
+  <table class="min-w-full divide-y">
+    <thead class="bg-gray-50 text-gray-600 text-sm">
+      <tr><th class="px-4 py-2 text-left w-16">#</th><th class="px-4 py-2 text-left">Savol</th></tr>
+    </thead>
+    <tbody class="divide-y">
+      <% questions.forEach(q => { %>
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2"><%= q.sort_order %></td>
+          <td class="px-4 py-2"><%= q.text %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>

@@ -1,0 +1,57 @@
+# ——— Node.js ———
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+bun.lockb
+
+
+# ——— Log va PID ———
+logs/
+*.log
+*.log.*
+pids/
+*.pid
+*.pid.lock
+*.seed
+
+# ——— Coverage / test chiqimlari ———
+coverage/
+.nyc_output/
+
+# ——— Build / cache / vaqtinchalik ———
+dist/
+build/
+.cache/
+.tmp/
+tmp/
+temp/
+
+# ——— Runtime fayllar (yuklamalar va h.k.) ———
+uploads/
+public/uploads/
+storage/
+sessions/
+exports/
+reports/
+
+# Agar loyihada vaqtincha SQLite ishlatilsa
+*.sqlite
+*.sqlite-journal
+
+# ——— Editor / OS ———
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+desktop.ini
+
+# ——— TypeScript / lint cache ———
+*.tsbuildinfo
+.eslintcache
+.stylelintcache
+
+# ——— PM2 (odatda global, baribir ehtiyot uchun) ———
+.pm2/

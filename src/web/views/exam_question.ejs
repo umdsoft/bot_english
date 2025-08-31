@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="uz" class="h-full bg-gray-50">
+<head>
+  <meta charset="utf-8">
+  <title>Savol</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="h-full">
+<div class="max-w-3xl mx-auto px-4 py-8">
+  <h1 class="text-xl font-semibold mb-4">Savol</h1>
+  <form method="post" action="/exam/answer/<%= attemptId %>" class="space-y-4 rounded-xl border bg-white p-5">
+    <input type="hidden" name="question_id" value="<%= q.id %>"/>
+    <div class="font-medium"><%= q.text %></div>
+    <div class="space-y-2">
+      <% opts.forEach(o => { %>
+        <label class="flex items-center gap-3">
+          <input type="radio" name="option_id" value="<%= o.id %>" class="h-4 w-4" required>
+          <span><%= o.text %></span>
+        </label>
+      <% }) %>
+    </div>
+    <div class="pt-2">
+      <button class="rounded bg-indigo-600 text-white px-4 py-2">Keyingi</button>
+      <a href="/exam" class="ml-2 text-sm underline text-gray-600">Bekor qilish</a>
+    </div>
+  </form>
+</div>
+</body>
+</html>

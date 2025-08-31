@@ -1,0 +1,55 @@
+<% layout('layout') -%>
+<h1 class="text-2xl font-semibold mb-5"><%= test ? 'Testni tahrirlash' : 'Yangi test' %></h1>
+
+<form method="post" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <% if (!test) { %>
+    <div class="col-span-1">
+      <label class="text-sm text-gray-600">Code</label>
+      <input name="code" required placeholder="eng_midterm_sep"
+             class="mt-1 w-full rounded-lg border px-3 py-2" />
+    </div>
+  <% } %>
+
+  <div>
+    <label class="text-sm text-gray-600">Nomi</label>
+    <input name="name" value="<%= test?.name || '' %>" required class="mt-1 w-full rounded-lg border px-3 py-2" />
+  </div>
+
+  <div>
+    <label class="text-sm text-gray-600">Til (lang)</label>
+    <input name="lang" value="<%= test?.lang || 'uz' %>" class="mt-1 w-full rounded-lg border px-3 py-2" />
+  </div>
+
+  <div>
+    <label class="text-sm text-gray-600">Time limit (sec)</label>
+    <input name="time_limit_sec" type="number" value="<%= test?.time_limit_sec || 0 %>"
+           class="mt-1 w-full rounded-lg border px-3 py-2" />
+  </div>
+
+  <div>
+    <label class="text-sm text-gray-600">Kategoriya</label>
+    <select name="category" class="mt-1 w-full rounded-lg border px-3 py-2">
+      <option value="placement" <%= test?.category==='placement'?'selected':'' %>>placement</option>
+      <option value="midterm"   <%= test?.category==='midterm'  ?'selected':'' %>>midterm</option>
+    </select>
+  </div>
+
+  <div>
+    <label class="text-sm text-gray-600">Audience</label>
+    <select name="audience" class="mt-1 w-full rounded-lg border px-3 py-2">
+      <option value="public"         <%= test?.audience==='public'        ?'selected':'' %>>public</option>
+      <option value="students_only"  <%= test?.audience==='students_only' ?'selected':'' %>>students_only</option>
+    </select>
+  </div>
+
+  <div class="flex items-center gap-3">
+    <input id="ia" type="checkbox" name="is_active" <%= test?.is_active ? 'checked' : '' %> />
+    <label for="ia">Active</label>
+  </div>
+
+  <div class="md:col-span-2">
+    <button class="rounded-lg bg-indigo-600 text-white px-4 py-2">
+      <%= test ? 'Saqlash' : 'Yaratish' %>
+    </button>
+  </div>
+</form>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="uz" class="h-full bg-gray-50">
+  <head>
+    <meta charset="utf-8" />
+    <title><%= (typeof title !== 'undefined' ? title : 'Admin') %></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/assets/logo.png" />
+    <!-- Tailwind (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="h-full">
+    <% const _path = (typeof path !== 'undefined' ? path : ''); %>
+
+    <div class="min-h-full flex">
+      <!-- SIDEBAR (desktop) -->
+      <aside class="hidden md:flex md:w-64 flex-col bg-white border-r">
+        <div class="px-5 py-4 border-b flex items-center gap-3">
+          <img src="/assets/logo.png" class="h-7 w-7" alt="logo" />
+          <div class="font-semibold">Admin</div>
+        </div>
+
+        <nav class="px-3 py-3 space-y-1 text-sm">
+          <a
+            href="/admin"
+            class="flex items-center gap-3 px-3 py-2 rounded-lg <%= (_path === '/admin') ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100' %>"
+          >
+            <span>🏠</span><span>Dashboard</span>
+          </a>
+
+          <a
+            href="/admin/tests"
+            class="flex items-center gap-3 px-3 py-2 rounded-lg <%= (_path.startsWith('/admin/tests')) ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100' %>"
+          >
+            <span>🧪</span><span>Tests</span>
+          </a>
+
+          <a
+            href="/admin/attempts"
+            class="flex items-center gap-3 px-3 py-2 rounded-lg <%= (_path.startsWith('/admin/attempts')) ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100' %>"
+          >
+            <span>📊</span><span>Natijalar</span>
+          </a>
+
+          <a
+            href="/admin/users"
+            class="flex items-center gap-3 px-3 py-2 rounded-lg <%= (_path.startsWith('/admin/users')) ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100' %>"
+          >
+            <span>👥</span><span>O‘quvchilar</span>
+          </a>
+          <a
+            href="/admin/questions/bulk"
+            class="flex items-center gap-3 px-3 py-2 rounded-lg <%= (_path.startsWith('/admin/questions/bulk')) ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100' %>"
+          >
+            <span>📥</span><span>Bulk import</span>
+          </a>
+          <a
+            href="/admin/logout"
+            class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100"
+          >
+            <span>🚪</span><span>Chiqish</span>
+          </a>
+        </nav>
+      </aside>
+
+      <!-- MAIN -->
+      <main class="flex-1">
+        <!-- TOPBAR (mobile) -->
+        <div
+          class="md:hidden sticky top-0 z-10 bg-white/80 backdrop-blur border-b"
+        >
+          <div class="px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <img src="/assets/logo.png" class="h-6 w-6" alt="logo" />
+              <span class="font-semibold">Admin</span>
+            </div>
+            <div class="text-xs text-gray-600 space-x-3">
+              <a href="/admin" class="hover:underline">Dashboard</a>
+              <a href="/admin/tests" class="hover:underline">Tests</a>
+
+              <a href="/admin/attempts" class="hover:underline">Natijalar</a>
+              <a href="/admin/users" class="hover:underline">O‘quvchilar</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- CONTENT -->
+        <div class="max-w-6xl mx-auto px-4 py-6">
+          <%- include('partials/flash') %> <%- body %>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "name": "test-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon src/main.js",
+    "start": "node src/main.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "connect-flash": "^0.1.1",
+    "csv-parse": "^6.1.0",
+    "dayjs": "^1.11.15",
+    "dotenv": "^17.2.1",
+    "ejs": "^3.1.10",
+    "ejs-mate": "^4.0.0",
+    "express": "^5.1.0",
+    "express-session": "^1.18.2",
+    "multer": "^2.0.2",
+    "mysql2": "^3.14.3",
+    "pdfkit": "^0.17.1",
+    "telegraf": "^4.16.3",
+    "xlsx": "^0.18.5"
+  }
+}

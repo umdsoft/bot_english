@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="uz" class="h-full bg-gray-50">
+<head>
+  <meta charset="utf-8">
+  <title>Oraliq test — Kirish</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" href="/assets/logo.png" />
+</head>
+<body class="h-full">
+<div class="min-h-full grid place-items-center px-4 py-12">
+  <div class="w-full max-w-md">
+    <div class="flex flex-col items-center mb-6">
+      <img src="/assets/logo.png" class="h-10 w-10 mb-2" alt="logo">
+      <h1 class="text-xl font-semibold">Oraliq test — kirish</h1>
+      <p class="text-sm text-gray-500 text-center">Telegram botdan olingan <strong>OTP</strong> bilan kiring</p>
+    </div>
+
+    <% const _msg = Array.isArray(msg) ? msg.join('<br>') : (msg||''); %>
+    <% const _err = Array.isArray(error) ? error.join('<br>') : (error||''); %>
+    <% if (_msg) { %><div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 px-3 py-2 text-sm"><%- _msg %></div><% } %>
+    <% if (_err) { %><div class="mb-4 rounded-lg border border-rose-200 bg-rose-50 text-rose-800 px-3 py-2 text-sm"><%- _err %></div><% } %>
+
+    <div class="rounded-2xl border bg-white shadow-sm p-6">
+      <form method="post" action="/exam/login" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Telefon</label>
+          <input type="tel" name="phone" required placeholder="+99890..."
+                 class="mt-1 w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 px-3 py-2"/>
+          <p class="text-xs text-gray-500 mt-1">Login sifatida Telegram dagi raqamingiz ishlatiladi.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Parol (OTP)</label>
+          <input type="text" name="otp" required placeholder="6 xonali kod"
+                 class="mt-1 w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 px-3 py-2"/>
+          <p class="text-xs text-gray-500 mt-1">OTP’ni botdan “🔑 Veb-kirish kodi” tugmasi orqali oling.</p>
+        </div>
+        <button class="w-full rounded-lg bg-indigo-600 text-white px-4 py-2.5 font-medium hover:bg-indigo-700">Kirish</button>
+      </form>
+    </div>
+  </div>
+</div>
+</body>
+</html>

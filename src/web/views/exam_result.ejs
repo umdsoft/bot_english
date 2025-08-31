@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="uz" class="h-full bg-gray-50">
+<head>
+  <meta charset="utf-8">
+  <title>Natija</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="h-full">
+<div class="max-w-3xl mx-auto px-4 py-8">
+  <div class="rounded-2xl border bg-white p-6">
+    <h1 class="text-2xl font-semibold mb-2"><%= r.test_name %></h1>
+    <p class="text-sm text-gray-500 mb-4">
+      Boshlang: <%= r.started_at?.toISOString?.() ? r.started_at.toISOString().slice(0,19).replace('T',' ') : r.started_at %> ·
+      Tugadi: <%= r.finished_at?.toISOString?.() ? r.finished_at.toISOString().slice(0,19).replace('T',' ') : r.finished_at %>
+    </p>
+
+    <div class="grid grid-cols-3 gap-4 text-center mb-6">
+      <div class="rounded-lg bg-indigo-50 py-4">
+        <div class="text-3xl font-bold text-indigo-700"><%= r.percent %>%</div>
+        <div class="text-xs text-indigo-700/70">Foiz</div>
+      </div>
+      <div class="rounded-lg bg-emerald-50 py-4">
+        <div class="text-3xl font-bold text-emerald-700"><%= r.score %></div>
+        <div class="text-xs text-emerald-700/70">To‘g‘ri javoblar</div>
+      </div>
+      <div class="rounded-lg bg-rose-50 py-4">
+        <div class="text-3xl font-bold text-rose-700"><%= /* wrong = */ 0 %></div>
+        <div class="text-xs text-rose-700/70">Noto‘g‘ri</div>
+      </div>
+    </div>
+
+    <div class="flex gap-3">
+      <a href="/exam" class="rounded bg-gray-800 text-white px-4 py-2">Bosh sahifa</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>
