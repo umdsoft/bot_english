@@ -9,7 +9,9 @@ function askPhoneKeyboard() {
 function mainMenuKeyboard() {
   return Markup.keyboard([
     ["📝 Testni boshlash"],
+    ["📍 Manzil"],
     ["ℹ️ Ma’lumot", "🌍 Xalqaro ta’lim haqida ma’lumot"],
+    
   ]).resize();
 }
 
