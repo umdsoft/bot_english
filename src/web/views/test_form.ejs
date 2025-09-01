@@ -1,7 +1,7 @@
 <% layout('layout') -%>
 <h1 class="text-2xl font-semibold mb-5"><%= test ? 'Testni tahrirlash' : 'Yangi test' %></h1>
 
-<form method="post" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<form method="post" action="/admin/tests" class="grid grid-cols-1 md:grid-cols-2 gap-4">
   <% if (!test) { %>
     <div class="col-span-1">
       <label class="text-sm text-gray-600">Code</label>

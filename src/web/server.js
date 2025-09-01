@@ -5,7 +5,7 @@ const session = require("express-session");
 const flash = require("connect-flash");
 const engine = require("ejs-mate");
 const adminRoutes = require("./routes/admin");
-
+const morgan = require('morgan');
 const app = express();
 
 // EJS
@@ -13,6 +13,16 @@ app.engine("ejs", engine); // <- qo'shildi
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
+// morgan: URL, status, vaqt, va POST body (sanitizatsiya) ni ko’rsatamiz
+morgan.token("body", (req) => {
+  if (!req.body || Object.keys(req.body).length === 0) return "";
+  // sirlilarni yashirib loglaymiz
+  const clone = { ...req.body };
+  if (clone.password) clone.password = "***";
+  if (clone.web_otp) clone.web_otp = "***";
+  return JSON.stringify(clone);
+});
+app.use(morgan(":method :url :status :response-time ms :body"));
 // middlewares
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());

@@ -2,19 +2,17 @@
 <h1 class="text-2xl font-semibold mb-4">Bulk import (XLSX)</h1>
 
 <p class="text-sm text-gray-600 mb-4">
-  Fayl format: <code class="bg-gray-100 px-1 rounded">test_id, question, correct_answer, answer_1, answer_2, answer_3, [answer_4..answer_8]</code>
+  Fayl format (sarlavhalar): 
+  <code class="bg-gray-100 px-1 rounded">
+    test_id, question, correct_answer, answer_1, answer_2, answer_3, answer_4[, answer_5..answer_8]
+  </code>
 </p>
 
 <div class="rounded-xl border bg-white p-5 mb-5">
   <form method="post" action="/admin/questions/bulk" enctype="multipart/form-data" class="space-y-3">
     <div>
       <label class="text-sm text-gray-600">XLSX fayl</label>
-      <input type="file" name="xlsx" accept=".xlsx" required
-             class="mt-1 w-full rounded-lg border px-3 py-2" />
-    </div>
-    <div class="text-sm text-gray-600">
-      Shablon: <a class="text-indigo-600 underline" href="/assets/questions_bulk_template.xlsx" download>questions_bulk_template.xlsx</a>
-      <span class="text-gray-400">(shablonni <code>/assets/</code> ga qo‘yib qo‘ysangiz, bu link ishlaydi)</span>
+      <input type="file" name="xlsx" accept=".xlsx" required class="mt-1 w-full rounded-lg border px-3 py-2" />
     </div>
     <button class="rounded-lg bg-indigo-600 text-white px-4 py-2">Yuklash</button>
   </form>
@@ -22,7 +20,6 @@
 
 <div class="text-sm text-gray-600">
   * Eslatma: <br/>
-  – <code>test_id</code> — tests jadvalidagi ID bo‘lishi shart. <br/>
-  – <code>correct_answer</code> variantlar ichida topilmasa, avtomatik qo‘shiladi (⚠️ sifatida hisoblanadi). <br/>
-  – Kamida 2 ta <code>answer_n</code> bo‘lishi kerak.
+  – <code>correct_answer</code> quyidagilardan biri bo‘lishi mumkin: <b>variant matni</b> (tavsiya etiladi), yoki <b>1..8</b>, yoki <b>A..H</b>. <br/>
+  – Kamida 2 ta <code>answer_n</code> to‘ldirilgan bo‘lishi kerak.
 </div>
