@@ -110,5 +110,23 @@ async function generateResultPDF(attemptId, counts) {
     }
   });
 }
+async function sendResultPDF(telegram, chatId, attemptId, counts, caption = "") {
+  try {
+    const filePath = await generateResultPDF(attemptId, counts);
 
-module.exports = { generateResultPDF };
+    // faylni o'qish streami orqali yuboramiz (yirik fayllarda ham ishonchli)
+    await telegram.sendDocument(
+      chatId,
+      { source: fs.createReadStream(filePath), filename: `result_${attemptId}.pdf` },
+      { caption }
+    );
+
+    // vaqtinchalik faylni o'chirish
+    try { fs.unlinkSync(filePath); } catch (_) {}
+    return true;
+  } catch (err) {
+    console.error("sendResultPDF error:", err?.description || err?.message || err);
+    return false;
+  }
+}
+module.exports = { generateResultPDF, sendResultPDF  };

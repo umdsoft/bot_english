@@ -1,32 +1,10 @@
 const { pool } = require("../db");
 
 async function getActiveTest(opts = {}) {
-  const code     = opts.code || process.env.DEFAULT_TEST_CODE || null;
-  const audience = opts.audience || null; // 'public' yoki 'students' va h.k.
-  const lang     = opts.lang || null;     // 'uz' | 'ru' | 'en' bo'lsa ishlatamiz
-
-  // 1) Agar kod berilgan bo'lsa, unga urinamiz
-  if (code) {
-    const [byCode] = await pool.query(
-      "SELECT * FROM tests WHERE code=? AND is_active=1 LIMIT 1",
-      [code]
-    );
-    if (byCode.length) return byCode[0];
-  }
-
-  // 2) Eng mos faol test (audience/lang bo'yicha), oxirgi qo'shilgan
-  let sql =
-    "SELECT * FROM tests WHERE is_active=1";
-  const params = [];
-  if (audience) { sql += " AND audience=?"; params.push(audience); }
-  if (lang)     { sql += " AND lang=?";     params.push(lang);     }
-  sql += " ORDER BY id DESC LIMIT 1";
-
-  let [rows] = await pool.query(sql, params);
-  if (rows.length) return rows[0];
-
-  // 3) Fallback: umuman bo'lsa ham — eng oxirgi testni olamiz
-  [rows] = await pool.query("SELECT * FROM tests ORDER BY id DESC LIMIT 1");
+  const [rows] = await pool.query(
+    "SELECT * FROM tests WHERE code=? AND is_active=1",
+    [code]
+  );
   return rows[0] || null;
 }
 
