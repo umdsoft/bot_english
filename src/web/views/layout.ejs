@@ -40,7 +40,12 @@
           >
             <span>📊</span><span>Natijalar</span>
           </a>
-
+ <a
+            href="/admin/leads"
+            class="flex items-center gap-3 px-3 py-2 rounded-lg <%= (_path.startsWith('/admin/leads')) ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100' %>"
+          >
+            <span>👥</span><span>Lidlar</span>
+          </a>
           <a
             href="/admin/users"
             class="flex items-center gap-3 px-3 py-2 rounded-lg <%= (_path.startsWith('/admin/users')) ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100' %>"
@@ -84,7 +89,7 @@
         </div>
 
         <!-- CONTENT -->
-        <div class="max-w-6xl mx-auto px-4 py-6">
+        <div class="max-w-7xl mx-auto px-4 py-6">
           <%- include('partials/flash') %> <%- body %>
         </div>
       </main>

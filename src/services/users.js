@@ -1,18 +1,27 @@
+// src/services/users.js
 const { pool } = require("../db");
 
 async function upsertUserByCtx(ctx, lang = "uz") {
   const tg = ctx.from;
-  const fullName = [tg.first_name, tg.last_name].filter(Boolean).join(" ");
+  if (!tg?.id) throw new Error("from.id yo'q");
+
+  const fullName = [tg.first_name, tg.last_name].filter(Boolean).join(" ") || null;
   const username = tg.username || null;
 
-  const [rows] = await pool.query("SELECT id FROM users WHERE tg_id=?", [tg.id]);
-  if (rows.length) return rows[0].id;
+  const sql = `
+    INSERT INTO users (tg_id, full_name, username, lang)
+    VALUES (?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE
+      full_name = VALUES(full_name),
+      username  = VALUES(username),
+      lang      = VALUES(lang),
+      id        = LAST_INSERT_ID(id)
+  `;
+  const params = [tg.id, fullName, username, lang];
 
-  const [ins] = await pool.query(
-    "INSERT INTO users (tg_id, full_name, username, lang) VALUES (?,?,?,?)",
-    [tg.id, fullName, username, lang]
-  );
-  return ins.insertId;
+  const [res] = await pool.query(sql, params);
+  // Yangi yozuv bo'lsa insertId = yangi id, bor bo'lsa LAST_INSERT_ID(id) orqali mavjud id
+  return res.insertId;
 }
 
 async function getUserByTgId(tgId) {
@@ -22,14 +31,13 @@ async function getUserByTgId(tgId) {
 
 async function saveContact(ctx) {
   const tgId = ctx.from.id;
-  const phone = ctx.message.contact.phone_number;
-  const fullName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(" ");
+  const phone = ctx.message?.contact?.phone_number || null;
+  const fullName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(" ") || null;
 
-  await pool.query("UPDATE users SET phone=?, full_name=? WHERE tg_id=?", [
-    phone,
-    fullName,
-    tgId,
-  ]);
+  await pool.query(
+    "UPDATE users SET phone = ?, full_name = ? WHERE tg_id = ?",
+    [phone, fullName, tgId]
+  );
 }
 
 module.exports = { upsertUserByCtx, getUserByTgId, saveContact };

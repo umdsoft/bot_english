@@ -1,7 +1,8 @@
 <% layout('layout') -%>
 <h1 class="text-2xl font-semibold mb-5">Dashboard</h1>
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<!-- Stat cards -->
+<div class="grid grid-cols-1 md:grid-cols-5 gap-4">
   <div class="rounded-xl border bg-white p-5">
     <div class="text-sm text-gray-500">Foydalanuvchilar</div>
     <div class="text-3xl font-bold mt-1"><%= stats.users %></div>
@@ -14,4 +15,104 @@
     <div class="text-sm text-gray-500">Yakunlangan urinishlar</div>
     <div class="text-3xl font-bold mt-1"><%= stats.attempts %></div>
   </div>
+  <div class="rounded-xl border bg-white p-5">
+    <div class="text-sm text-gray-500">Bugun topshirganlar</div>
+    <div class="text-3xl font-bold mt-1"><%= today.count %></div>
+  </div>
+  <div class="rounded-xl border bg-white p-5">
+    <div class="text-sm text-gray-500">Bugungi o‘rtacha %</div>
+    <div class="text-3xl font-bold mt-1"><%= today.avg_percent ? today.avg_percent.toFixed(1) : 0 %>%</div>
+  </div>
 </div>
+
+<!-- Chart + Top5 -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+  <!-- PIE chart: darajalar bo‘yicha o‘rtacha % -->
+  <div class="rounded-xl border bg-white p-5">
+    <div class="text-sm text-gray-500 mb-2">Darajalar bo‘yicha o‘rtacha %</div>
+    <canvas id="levelPie" height="200"></canvas>
+  </div>
+
+  <!-- Top 5 by level -->
+  <div class="rounded-xl border bg-white p-5">
+    <div class="text-sm text-gray-500 mb-2">Darajalar bo‘yicha TOP-5 (foiz)</div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <% const medal = ['🥇','🥈','🥉']; %>
+      <% levels.forEach(lvl => { const list = (top5[lvl] || []); %>
+        <div>
+          <div class="font-semibold mb-2"><%= lvl %></div>
+          <ol class="space-y-1">
+            <% list.forEach((r,i) => { %>
+              <li class="flex items-center justify-between rounded border px-3 py-1.5">
+                <span class="truncate">
+                  <%= (i < 3) ? medal[i] + ' ' : ((i+1)+'. ') %>
+                  <%= r.full_name || ('ID '+r.user_id) %>
+                  <% if (r.username) { %><span class="text-gray-500">(@<%= r.username %>)</span><% } %>
+                </span>
+                <span class="font-semibold"><%= Number(r.percent).toFixed(1) %>%</span>
+              </li>
+            <% }) %>
+            <% if (!list.length) { %>
+              <li class="text-sm text-gray-500">Ma’lumot yo‘q</li>
+            <% } %>
+          </ol>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  (function () {
+    // Router’dan keladi: chartPie = { labels, averages, counts }
+    const labels = <%- JSON.stringify(chartPie.labels) %>;
+    const averages = <%- JSON.stringify(chartPie.averages) %>;
+    const counts = <%- JSON.stringify(chartPie.counts) %>;
+
+    // 0 bo‘lgan bo‘laklarni yashirish (xohlasangiz olib tashlang)
+    const items = labels.map((l,i)=>({l, v: Number(averages[i]||0), n: Number(counts[i]||0)}))
+                        .filter(x => x.v > 0);
+
+    const L = items.map(x => x.l);
+    const D = items.map(x => Number(x.v.toFixed(2)));
+    const N = items.map(x => x.n);
+
+    const colors = [
+      '#60a5fa','#34d399','#f472b6','#fbbf24',
+      '#a78bfa','#f87171','#22d3ee','#c084fc',
+      '#4ade80','#f59e0b'
+    ].slice(0, L.length);
+
+    const ctx = document.getElementById('levelPie');
+    new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: L,
+        datasets: [{
+          label: 'O‘rtacha %',
+          data: D,
+          backgroundColor: colors,
+          borderWidth: 1
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                const i = ctx.dataIndex;
+                const name = ctx.label || '';
+                const v = ctx.parsed;
+                const n = N[i] ?? 0;
+                return ` ${name}: ${v}%  (n=${n})`;
+              }
+            }
+          }
+        }
+      }
+    });
+  })();
+</script>

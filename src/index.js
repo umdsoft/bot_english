@@ -2,12 +2,16 @@
 require("dotenv").config();
 const dayjs = require("dayjs");
 const { Telegraf, Markup, Input } = require("telegraf");
-const { TZ } = require("./config");
+
+// ⬅️ CHANNEL_ID ham configdan kelsa, shu yerda import qilamiz
+const { TZ, CHANNEL_ID } = require("./config"); // ⬅️ YANGI: CHANNEL_ID qo'shildi
+
 const { pool } = require("./db");
 process.env.TZ = TZ;
 const fs = require("fs");
 const { sendResultPDF } = require("./services/pdf"); // pdf.js dan
 const bot = new Telegraf(process.env.BOT_TOKEN);
+
 const {
   getNextQuestion,
   getOptions,
@@ -17,6 +21,7 @@ const {
 const { generateResultPDF } = require("./services/pdf");
 const { awardPointsForTest } = require("./services/points");
 const { askPhoneKeyboard } = require("./keyboards");
+
 // Handlers & middlewares
 const { registerStart } = require("./handlers/start");
 const { registerInfo } = require("./handlers/info");
@@ -24,9 +29,23 @@ const { registerTestFlow } = require("./handlers/testFlow");
 const { registerLead } = require("./handlers/leads");
 const { registerAdmin } = require("./handlers/admin");
 const { resumePrompt } = require("./middlewares/resumePrompt");
-// const { registerTestFlow } = require("./handlers/testGroupFlow");
+
+// ⬅️ Kanal relay handler (kanal postiga reply qilib nusxalash)
+const { registerChannelRelay } = require("./handlers/channelRelay");
+
+
 let wired = false; // handlerlar ikki marta registratsiya bo‘lib ketmasin
 let launched = false;
+
+// -------- SAFE HELPERS (app yiqilmasin) --------
+function safeReply(ctx, text, extra) {
+  // 403 (blocked) va boshqa xatolarni yutib yuboramiz
+  return ctx.reply(text, extra).catch(() => null);
+}
+function safeAnswerCb(ctx, text, extra) {
+  return ctx.answerCbQuery(text, extra).catch(() => {});
+}
+
 // --- ADD: savol yuborish / yakunlash sikli ---
 async function sendNextQuestion(ctx, testId, attemptId) {
   // navbatdagi savolni olamiz
@@ -38,7 +57,7 @@ async function sendNextQuestion(ctx, testId, attemptId) {
     const summary = await getAttemptSummary(attemptId);
 
     // Kanal ID (env ustun, bo'lmasa config)
-    const channelId = process.env.CHANNEL_ID || CHANNEL_ID;
+    const channelId = process.env.CHANNEL_ID || CHANNEL_ID; // ⬅️ CHANNEL_ID endi importdan keladi
 
     const caption =
       `✅ Test yakunlandi\n` +
@@ -68,32 +87,44 @@ async function sendNextQuestion(ctx, testId, attemptId) {
       );
     }
 
-    // 🎁 Ball (1 test = 1 marta; not-student cap=10) — try/catchsiz
-    const award = await awardPointsForTest({
-      userId: res.userId,
-      testId: res.testId,
-      attemptId,
-      basePoints: 2,
-    });
+    // 🎁 Ball (1 test = 1 marta; not-student cap=10)
+    try {
+      const award = await awardPointsForTest({
+        userId: res.userId,
+        testId: res.testId,
+        attemptId,
+        basePoints: 2,
+      });
 
-    const ballMsg =
-      `\n🎁 Ballar: Bu test uchun sizga **${award.awarded} ball** berildi.\n` +
-      `🗓 Joriy oy: **${award.monthly} / 100** ball\n` +
-      `📈 Umumiy: **${award.total}** ball\n` +
-      `ℹ️ Ballarni kelajakda chegirmalarga almashtirishingiz mumkin.`;
+      const ballMsg =
+        `\n🎁 Ballar: Bu test uchun sizga **${award.awarded} ball** berildi.\n` +
+        `🗓 Joriy oy: **${award.monthly} / 100** ball\n` +
+        `📈 Umumiy: **${award.total}** ball\n` +
+        `ℹ️ Ballarni kelajakda chegirmalarga almashtirishingiz mumkin.`;
 
-    // Yakuniy natija xabari
-    await ctx.reply(
-      `✅ Test yakunlandi!\n` +
-      `Foiz: ${res.percent}%\nDaraja: ${res.level}\n` +
-      `✅ To‘g‘ri: ${res.correctCount} ta · ❌ ${res.wrongCount} ta` +
-      ballMsg
-    );
+      // Yakuniy natija xabari (safe)
+      await safeReply(
+        ctx,
+        `✅ Test yakunlandi!\n` +
+          `Foiz: ${res.percent}%\nDaraja: ${res.level}\n` +
+          `✅ To‘g‘ri: ${res.correctCount} ta · ❌ ${res.wrongCount} ta` +
+          ballMsg
+      );
+    } catch (e) {
+      // ball hisoblash xatosi appni to'xtatmasin
+      await safeReply(
+        ctx,
+        `✅ Test yakunlandi!\n` +
+          `Foiz: ${res.percent}%\nDaraja: ${res.level}\n` +
+          `✅ To‘g‘ri: ${res.correctCount} ta · ❌ ${res.wrongCount} ta`
+      );
+    }
 
-    // 🔔 LEAD CTA tugmalari (handler ichidagi leads js ni ishga tushiradi)
-    await ctx.reply(
+    // 🔔 LEAD CTA tugmalari (handler ichidagi leads js ni ishga tushiradi) — safe
+    await safeReply(
+      ctx,
       "🎉 Natijangiz bilan tabriklaymiz!  \n" +
-      "**Bugun ro‘yxatdan o‘tsangiz — 10% chegirma!**",
+        "**Bugun ro‘yxatdan o‘tsangiz — 10% chegirma!**",
       Markup.inlineKeyboard([
         [Markup.button.callback("📚 Kursda o‘qimoqchiman", "lead:start")],
         [Markup.button.callback("ℹ️ Batafsil ma’lumot", "lead:info")],
@@ -103,12 +134,12 @@ async function sendNextQuestion(ctx, testId, attemptId) {
     return;
   }
 
-  // savol variantlarini yuboramiz
+  // savol variantlarini yuboramiz — safe
   const opts = await getOptions(q.id);
   const buttons = opts.map((o) => [
     Markup.button.callback(o.text, `ans:${q.id}:${o.id}:${attemptId}`),
   ]);
-  await ctx.reply(`❓ ${q.text}`, Markup.inlineKeyboard(buttons));
+  await safeReply(ctx, `❓ ${q.text}`, Markup.inlineKeyboard(buttons));
 }
 
 async function wireUp() {
@@ -119,35 +150,53 @@ async function wireUp() {
   registerLead(bot);
   registerAdmin(bot);
   bot.use(resumePrompt);
+
+  // ⬅️ Kanalga post joylanganda, bot o‘sha postga reply qilib nusxa qoldiradi
+  registerChannelRelay(bot);
+
   wired = true;
 }
-// --- ADD: test varianti tanlanganda ishlovchi umumiy handler ---
+
 bot.on("callback_query", async (ctx, next) => {
   const data = ctx.callbackQuery?.data || "";
 
   if (data.startsWith("ans:")) {
-    const [, qIdStr, optIdStr, attemptStr] = data.split(":");
-    const qId = Number(qIdStr),
-      optId = Number(optIdStr),
-      attemptId = Number(attemptStr);
+    // DARHOL ack — 15s limitdan o'tmaslik uchun
+    safeAnswerCb(ctx, "Qabul qilindi ✅", { show_alert: false });
 
-    // javobni saqlaymiz
-    const { saveAnswer } = require("./services/tests");
-    await saveAnswer(attemptId, qId, optId);
+    try {
+      const [, qIdStr, optIdStr, attemptStr] = data.split(":");
+      const qId = Number(qIdStr);
+      const optId = Number(optIdStr);
+      const attemptId = Number(attemptStr);
 
-    await ctx.answerCbQuery("Qabul qilindi ✅");
+      if (!qId || !optId || !attemptId) return; // yaroqsiz payload
 
-    // keyingi savolga o'tamiz
-    const [[att]] = await pool.query(
-      "SELECT test_id FROM attempts WHERE id=?",
-      [attemptId]
-    );
-    if (!att) return ctx.reply("Urinish topilmadi.");
-    return sendNextQuestion(ctx, att.test_id, attemptId);
+      // Javobni saqlash
+      const { saveAnswer } = require("./services/tests");
+      await saveAnswer(attemptId, qId, optId);
+
+      // Keyingi savolga o'tish
+      const [[att]] = await pool.query(
+        "SELECT test_id FROM attempts WHERE id=?",
+        [attemptId]
+      );
+      if (!att) {
+        await safeReply(ctx, "Urinish topilmadi.");
+        return;
+      }
+
+      await sendNextQuestion(ctx, att.test_id, attemptId);
+    } catch (e) {
+      console.error("callback 'ans:' error:", e?.description || e?.message || e);
+    }
+
+    return; // shu yerda tugatamiz
   }
 
   return next(); // boshqa callbacklar ham ishlashi uchun
 });
+
 async function startBot() {
   await wireUp();
 
@@ -163,6 +212,7 @@ async function startBot() {
   }
 
   if (!launched) {
+    // Polling rejimi — channel_post/edited_channel_post avtomatik keladi
     await bot.launch();
     launched = true;
     console.log(`[${dayjs().format("YYYY-MM-DD HH:mm:ss")}] Bot started`);

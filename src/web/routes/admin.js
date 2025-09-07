@@ -5,7 +5,8 @@ const { pool } = require("../../db");
 const { ensureAuth, ensureGuest } = require("../middleware/auth");
 const xlsx = require("xlsx"); // ← qo'shildi
 const router = express.Router();
-
+const dayjs = require("dayjs");
+const ExcelJS = require("exceljs");
 const { q } = require("../../db"); // <— SHU QATOR SHART
 // ---- ENV-based admin cred ----
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "admin@local")
@@ -20,13 +21,13 @@ const upload = multer({
     // ruxsat berilgan mimetype lar
     const ok = [
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/octet-stream" // ba'zi brauzerlar .xlsx ni shunday yuboradi
+      "application/octet-stream", // ba'zi brauzerlar .xlsx ni shunday yuboradi
     ];
     if (!ok.includes(file.mimetype)) {
       return cb(new Error("XLSX fayl emas (mimetype: " + file.mimetype + ")"));
     }
     cb(null, true);
-  }
+  },
 });
 // ---- LOGIN / LOGOUT ----
 router.get("/login", ensureGuest, (req, res) => {
@@ -51,14 +52,105 @@ router.get("/logout", ensureAuth, (req, res) => {
 
 // ---- DASHBOARD ----
 router.get("/", ensureAuth, async (req, res) => {
-  const [[cUsers]] = await pool.query("SELECT COUNT(*) AS c FROM users");
-  const [[cTests]] = await pool.query("SELECT COUNT(*) AS c FROM tests");
+  const groupOrder = [
+    'Beginner','Elementary','Pre-Intermediate','Intermediate',
+    'Upper-Intermediate','Advanced','IELTS','CEFR'
+  ];
+
+  const [[cUsers]]    = await pool.query("SELECT COUNT(*) AS c FROM users");
+  const [[cTests]]    = await pool.query("SELECT COUNT(*) AS c FROM tests");
   const [[cAttempts]] = await pool.query("SELECT COUNT(*) AS c FROM attempts");
+
+  const [[today]] = await pool.query(`
+    SELECT COUNT(*) AS count, AVG(percent) AS avg_percent
+    FROM attempts
+    WHERE status='completed' AND DATE(started_at)=CURDATE()
+  `);
+
+  // tests.code asosida guruhlash (BEGINNER/ELEMENTARY/...)
+  const [byGroup] = await pool.query(`
+    SELECT
+      CASE
+        WHEN LOWER(t.code) LIKE '%beginner%'               THEN 'Beginner'
+        WHEN LOWER(t.code) LIKE '%elementary%'             THEN 'Elementary'
+        WHEN LOWER(t.code) REGEXP 'pre[-_ ]?intermediate'  THEN 'Pre-Intermediate'
+        WHEN LOWER(t.code) REGEXP 'upper[-_ ]?intermediate' THEN 'Upper-Intermediate'
+        WHEN LOWER(t.code) LIKE '%intermediate%'           THEN 'Intermediate'
+        WHEN LOWER(t.code) LIKE '%advanced%'               THEN 'Advanced'
+        WHEN LOWER(t.code) LIKE '%ielts%'                  THEN 'IELTS'
+        WHEN LOWER(t.code) LIKE '%cefr%'                   THEN 'CEFR'
+        ELSE 'Other'
+      END AS gname,
+      COUNT(*) AS cnt,
+      AVG(a.percent) AS avg_percent
+    FROM attempts a
+    JOIN tests t ON t.id = a.test_id
+    WHERE a.status='completed'
+    GROUP BY gname
+  `);
+
+  const m = new Map(byGroup.map(r => [r.gname, r]));
+  // PIE uchun faqat avg % kerak (nol bo‘lgan guruhlarni ham ko‘rsatamiz, lekin xohlasaq filtrlaymiz)
+  const chartPie = {
+    labels: groupOrder,
+    averages: groupOrder.map(n => Number(m.get(n)?.avg_percent || 0)),
+    counts: groupOrder.map(n => Number(m.get(n)?.cnt || 0)) // tooltip’da foydali
+  };
+
+  // --- TOP-5 bir xil qoladi (oldingi koddan) ---
+  const [topRows] = await pool.query(`
+    SELECT * FROM (
+      SELECT
+        CASE
+          WHEN LOWER(t.code) LIKE '%beginner%'               THEN 'Beginner'
+          WHEN LOWER(t.code) LIKE '%elementary%'             THEN 'Elementary'
+          WHEN LOWER(t.code) REGEXP 'pre[-_ ]?intermediate'  THEN 'Pre-Intermediate'
+          WHEN LOWER(t.code) REGEXP 'upper[-_ ]?intermediate' THEN 'Upper-Intermediate'
+          WHEN LOWER(t.code) LIKE '%intermediate%'           THEN 'Intermediate'
+          WHEN LOWER(t.code) LIKE '%advanced%'               THEN 'Advanced'
+          WHEN LOWER(t.code) LIKE '%ielts%'                  THEN 'IELTS'
+          WHEN LOWER(t.code) LIKE '%cefr%'                   THEN 'CEFR'
+          ELSE 'Other'
+        END AS gname,
+        a.user_id, u.full_name, u.username, a.percent,
+        ROW_NUMBER() OVER (
+          PARTITION BY
+            CASE
+              WHEN LOWER(t.code) LIKE '%beginner%'               THEN 'Beginner'
+              WHEN LOWER(t.code) LIKE '%elementary%'             THEN 'Elementary'
+              WHEN LOWER(t.code) REGEXP 'pre[-_ ]?intermediate'  THEN 'Pre-Intermediate'
+              WHEN LOWER(t.code) REGEXP 'upper[-_ ]?intermediate' THEN 'Upper-Intermediate'
+              WHEN LOWER(t.code) LIKE '%intermediate%'           THEN 'Intermediate'
+              WHEN LOWER(t.code) LIKE '%advanced%'               THEN 'Advanced'
+              WHEN LOWER(t.code) LIKE '%ielts%'                  THEN 'IELTS'
+              WHEN LOWER(t.code) LIKE '%cefr%'                   THEN 'CEFR'
+              ELSE 'Other'
+            END
+          ORDER BY a.percent DESC
+        ) AS rn
+      FROM attempts a
+      JOIN tests t ON t.id = a.test_id
+      LEFT JOIN users u ON u.id = a.user_id
+      WHERE a.status='completed'
+    ) x
+    WHERE x.rn <= 5
+    ORDER BY FIELD(gname, ${groupOrder.map(s => pool.escape(s)).join(', ')}), rn
+  `);
+
+  const top5 = groupOrder.reduce((acc, g) => (acc[g] = [], acc), {});
+  for (const r of topRows) top5[r.gname]?.push(r);
+
   res.render("dashboard", {
     user: req.session.adminUser,
     stats: { users: cUsers.c, tests: cTests.c, attempts: cAttempts.c },
+    today: { count: Number(today.count || 0), avg_percent: Number(today.avg_percent || 0) },
+    // pie uchun
+    chartPie,
+    levels: groupOrder,
+    top5
   });
 });
+
 
 // ---- TESTS CRUD ----
 router.get("/tests", ensureAuth, async (req, res) => {
@@ -154,146 +246,174 @@ router.get("/questions/bulk", ensureAuth, async (req, res) => {
 // input name="xlsx"
 
 // Import amali
-router.post('/questions/bulk', ensureAuth, upload.single('xlsx'), async (req, res) => {
-  if (!req.file) {
-    req.flash('error', 'Fayl tanlanmadi');
-    return res.redirect('/admin/questions/bulk');
-  }
-
-  // kichik yordamchilar
-  const norm = (s) => (s ?? '').toString().replace(/\s+/g, ' ').trim();
-  const key  = (s) => (s ?? '').toString().trim().toLowerCase();
-
-  // correct index: 1..8 | A..H | matn
-  function resolveCorrectIndex(options, correctRaw) {
-    const c = norm(correctRaw);
-    if (!c) return 0;
-    // raqam
-    if (/^\d+$/.test(c)) {
-      const n = parseInt(c, 10);
-      if (n >= 1 && n <= options.length) return n - 1;
-    }
-    // A..H
-    if (/^[A-Ha-h]$/.test(c)) {
-      const i = c.toUpperCase().charCodeAt(0) - 65;
-      if (i >= 0 && i < options.length) return i;
-    }
-    // matn orqali
-    const i = options.findIndex(o => norm(o).toLowerCase() === c.toLowerCase());
-    return i >= 0 ? i : 0;
-  }
-
-  let ok = 0, skipped = 0, warnings = 0;
-  let conn;
-
-  try {
-    const wb = xlsx.read(req.file.buffer, { type: 'buffer' });
-    const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('question')) || wb.SheetNames[0];
-    const ws = wb.Sheets[sheetName];
-    if (!ws) throw new Error('Excelda sheet topilmadi');
-
-    // sarlavhali obyektlar
-    const rawRows = xlsx.utils.sheet_to_json(ws, { defval: '' });
-    if (!rawRows.length) {
-      req.flash('error', 'Jadval bo‘sh ko‘rindi.');
-      return res.redirect('/admin/questions/bulk');
+router.post(
+  "/questions/bulk",
+  ensureAuth,
+  upload.single("xlsx"),
+  async (req, res) => {
+    if (!req.file) {
+      req.flash("error", "Fayl tanlanmadi");
+      return res.redirect("/admin/questions/bulk");
     }
 
-    conn = await pool.getConnection();
-    await conn.beginTransaction();
+    // kichik yordamchilar
+    const norm = (s) => (s ?? "").toString().replace(/\s+/g, " ").trim();
+    const key = (s) => (s ?? "").toString().trim().toLowerCase();
 
-    // tezkor keshlar
-    const testExists = new Map();
-    async function ensureTest(id) {
-      if (testExists.has(id)) return testExists.get(id);
-      const [[t]] = await conn.query('SELECT id FROM tests WHERE id=?', [id]);
-      const ex = !!t;
-      testExists.set(id, ex);
-      return ex;
-    }
-
-    const nextOrder = new Map();
-    async function allocOrder(testId) {
-      if (!nextOrder.has(testId)) {
-        const [[m]] = await conn.query(
-          'SELECT COALESCE(MAX(sort_order),0)+1 AS next FROM questions WHERE test_id=?',
-          [testId]
-        );
-        nextOrder.set(testId, Number(m?.next || 1));
+    // correct index: 1..8 | A..H | matn
+    function resolveCorrectIndex(options, correctRaw) {
+      const c = norm(correctRaw);
+      if (!c) return 0;
+      // raqam
+      if (/^\d+$/.test(c)) {
+        const n = parseInt(c, 10);
+        if (n >= 1 && n <= options.length) return n - 1;
       }
-      const v = nextOrder.get(testId);
-      nextOrder.set(testId, v + 1);
-      return v;
-    }
-
-    for (let r of rawRows) {
-      // sarlavhalarni kichik harfga moslab o‘qiymiz
-      const row = {};
-      for (const k of Object.keys(r)) row[key(k)] = r[k];
-
-      const testId = Number(row['test_id'] || 0);
-      const qtext  = norm(row['question']);
-      const correctRaw = row['correct_answer'];
-
-      if (!testId || !qtext) { skipped++; continue; }
-      if (!(await ensureTest(testId))) { skipped++; continue; }
-
-      // answer_1..answer_8
-      const options = [];
-      for (let i = 1; i <= 8; i++) {
-        const v = norm(row[`answer_${i}`]);
-        if (v) options.push(v);
+      // A..H
+      if (/^[A-Ha-h]$/.test(c)) {
+        const i = c.toUpperCase().charCodeAt(0) - 65;
+        if (i >= 0 && i < options.length) return i;
       }
-
-      // kamida 2 variant yoki correct bo‘lishi shart
-      if (options.length < 2 && !norm(correctRaw)) { skipped++; continue; }
-
-      const correctIndex = resolveCorrectIndex(options, correctRaw);
-
-      // savol
-      const order = await allocOrder(testId);
-      const [insQ] = await conn.query(
-        'INSERT INTO questions (test_id, text, sort_order) VALUES (?,?,?)',
-        [testId, qtext, order]
+      // matn orqali
+      const i = options.findIndex(
+        (o) => norm(o).toLowerCase() === c.toLowerCase()
       );
-
-      // variantlar
-      let sort = 1;
-      for (let i = 0; i < options.length; i++) {
-        const isCor = i === correctIndex ? 1 : 0;
-        await conn.query(
-          'INSERT INTO options (question_id, text, is_correct, sort_order, weight) VALUES (?,?,?,?,?)',
-          [insQ.insertId, options[i], isCor, sort++, isCor ? 1 : 0]
-        );
-      }
-
-      // ogohlantirish: correct topilmasa yoki bo‘sh bo‘lsa
-      if (!norm(correctRaw)) warnings++;
-      else {
-        const cr = norm(correctRaw);
-        const numLike = /^\d+$/.test(cr) || /^[A-Ha-h]$/.test(cr);
-        if (!numLike) {
-          const matched = options.some(o => norm(o).toLowerCase() === cr.toLowerCase());
-          if (!matched) warnings++;
-        }
-      }
-
-      ok++;
+      return i >= 0 ? i : 0;
     }
 
-    await conn.commit();
-    req.flash('msg', `✅ Yuklandi: ${ok}. ⏭ O‘tkazildi: ${skipped}. ⚠️ Ogohlantirish: ${warnings}.`);
-  } catch (e) {
-    if (conn) { try { await conn.rollback(); } catch (_) {} }
-    console.error('Bulk XLSX import error:', e);
-    req.flash('error', 'Import xatosi: ' + e.message);
-  } finally {
-    if (conn) conn.release();
+    let ok = 0,
+      skipped = 0,
+      warnings = 0;
+    let conn;
+
+    try {
+      const wb = xlsx.read(req.file.buffer, { type: "buffer" });
+      const sheetName =
+        wb.SheetNames.find((n) => n.toLowerCase().includes("question")) ||
+        wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      if (!ws) throw new Error("Excelda sheet topilmadi");
+
+      // sarlavhali obyektlar
+      const rawRows = xlsx.utils.sheet_to_json(ws, { defval: "" });
+      if (!rawRows.length) {
+        req.flash("error", "Jadval bo‘sh ko‘rindi.");
+        return res.redirect("/admin/questions/bulk");
+      }
+
+      conn = await pool.getConnection();
+      await conn.beginTransaction();
+
+      // tezkor keshlar
+      const testExists = new Map();
+      async function ensureTest(id) {
+        if (testExists.has(id)) return testExists.get(id);
+        const [[t]] = await conn.query("SELECT id FROM tests WHERE id=?", [id]);
+        const ex = !!t;
+        testExists.set(id, ex);
+        return ex;
+      }
+
+      const nextOrder = new Map();
+      async function allocOrder(testId) {
+        if (!nextOrder.has(testId)) {
+          const [[m]] = await conn.query(
+            "SELECT COALESCE(MAX(sort_order),0)+1 AS next FROM questions WHERE test_id=?",
+            [testId]
+          );
+          nextOrder.set(testId, Number(m?.next || 1));
+        }
+        const v = nextOrder.get(testId);
+        nextOrder.set(testId, v + 1);
+        return v;
+      }
+
+      for (let r of rawRows) {
+        // sarlavhalarni kichik harfga moslab o‘qiymiz
+        const row = {};
+        for (const k of Object.keys(r)) row[key(k)] = r[k];
+
+        const testId = Number(row["test_id"] || 0);
+        const qtext = norm(row["question"]);
+        const correctRaw = row["correct_answer"];
+
+        if (!testId || !qtext) {
+          skipped++;
+          continue;
+        }
+        if (!(await ensureTest(testId))) {
+          skipped++;
+          continue;
+        }
+
+        // answer_1..answer_8
+        const options = [];
+        for (let i = 1; i <= 8; i++) {
+          const v = norm(row[`answer_${i}`]);
+          if (v) options.push(v);
+        }
+
+        // kamida 2 variant yoki correct bo‘lishi shart
+        if (options.length < 2 && !norm(correctRaw)) {
+          skipped++;
+          continue;
+        }
+
+        const correctIndex = resolveCorrectIndex(options, correctRaw);
+
+        // savol
+        const order = await allocOrder(testId);
+        const [insQ] = await conn.query(
+          "INSERT INTO questions (test_id, text, sort_order) VALUES (?,?,?)",
+          [testId, qtext, order]
+        );
+
+        // variantlar
+        let sort = 1;
+        for (let i = 0; i < options.length; i++) {
+          const isCor = i === correctIndex ? 1 : 0;
+          await conn.query(
+            "INSERT INTO options (question_id, text, is_correct, sort_order, weight) VALUES (?,?,?,?,?)",
+            [insQ.insertId, options[i], isCor, sort++, isCor ? 1 : 0]
+          );
+        }
+
+        // ogohlantirish: correct topilmasa yoki bo‘sh bo‘lsa
+        if (!norm(correctRaw)) warnings++;
+        else {
+          const cr = norm(correctRaw);
+          const numLike = /^\d+$/.test(cr) || /^[A-Ha-h]$/.test(cr);
+          if (!numLike) {
+            const matched = options.some(
+              (o) => norm(o).toLowerCase() === cr.toLowerCase()
+            );
+            if (!matched) warnings++;
+          }
+        }
+
+        ok++;
+      }
+
+      await conn.commit();
+      req.flash(
+        "msg",
+        `✅ Yuklandi: ${ok}. ⏭ O‘tkazildi: ${skipped}. ⚠️ Ogohlantirish: ${warnings}.`
+      );
+    } catch (e) {
+      if (conn) {
+        try {
+          await conn.rollback();
+        } catch (_) {}
+      }
+      console.error("Bulk XLSX import error:", e);
+      req.flash("error", "Import xatosi: " + e.message);
+    } finally {
+      if (conn) conn.release();
+    }
+
+    res.redirect("/admin/questions/bulk");
   }
-
-  res.redirect('/admin/questions/bulk');
-});
-
+);
 
 router.post("/tests/:id/delete", ensureAuth, async (req, res) => {
   await pool.query("DELETE FROM tests WHERE id=?", [req.params.id]);
@@ -327,14 +447,20 @@ router.post(
     const testId = Number(req.params.id);
     const log = (...a) => console.log("[BULK XLSX]", ...a);
 
-    let ok = 0, skipped = 0, warnings = 0, failed = 0;
+    let ok = 0,
+      skipped = 0,
+      warnings = 0,
+      failed = 0;
     const rowErrors = [];
 
     try {
-      if (!req.file) throw new Error('Fayl topilmadi. input name="xlsx" bo‘lsin');
+      if (!req.file)
+        throw new Error('Fayl topilmadi. input name="xlsx" bo‘lsin');
 
       // test borligini tekshir
-      const [[t]] = await pool.query("SELECT id FROM tests WHERE id=?", [testId]);
+      const [[t]] = await pool.query("SELECT id FROM tests WHERE id=?", [
+        testId,
+      ]);
       if (!t) throw new Error("Test topilmadi: id=" + testId);
 
       // Excel o‘qish
@@ -342,13 +468,21 @@ router.post(
       const rows = [];
       for (const name of wb.SheetNames) {
         const low = name.toLowerCase();
-        if (low.startsWith("instruction")) { log(`sheet "${name}" skipped`); continue; }
+        if (low.startsWith("instruction")) {
+          log(`sheet "${name}" skipped`);
+          continue;
+        }
         const ws = wb.Sheets[name];
         if (!ws) continue;
         const arr = xlsx.utils.sheet_to_json(ws, { defval: "", raw: false });
         if (arr[0]) {
-          const keys = Object.keys(arr[0]).map(k =>
-            `"${k.toString().replace(/\u00A0/g, " ").trim().toLowerCase()}"`
+          const keys = Object.keys(arr[0]).map(
+            (k) =>
+              `"${k
+                .toString()
+                .replace(/\u00A0/g, " ")
+                .trim()
+                .toLowerCase()}"`
           );
           log(`"${name}" first row keys:`, keys.join(", "));
         }
@@ -356,8 +490,19 @@ router.post(
       }
       log("TOTAL rows:", rows.length);
 
-      const cleanKey = (s) => s.toString().replace(/\u00A0/g, " ").trim().toLowerCase();
-      const cleanVal = (s) => (s == null ? "" : s.toString().replace(/\u00A0/g, " ").trim());
+      const cleanKey = (s) =>
+        s
+          .toString()
+          .replace(/\u00A0/g, " ")
+          .trim()
+          .toLowerCase();
+      const cleanVal = (s) =>
+        s == null
+          ? ""
+          : s
+              .toString()
+              .replace(/\u00A0/g, " ")
+              .trim();
       const pick = (obj, candidates) => {
         for (const k of Object.keys(obj)) {
           const ck = cleanKey(k);
@@ -374,7 +519,7 @@ router.post(
         "SHOW COLUMNS FROM `options` LIKE 'weight'"
       );
       const haveIsCorrect = hasIsCorrectCol.length > 0;
-      const haveWeight   = hasWeightCol.length > 0;
+      const haveWeight = hasWeightCol.length > 0;
 
       const insertOptionSQL = (() => {
         if (haveIsCorrect && haveWeight) {
@@ -402,16 +547,23 @@ router.post(
 
           try {
             // Agar faylda test_id ustuni bo‘lsa – tekshiramiz
-            const rid = Number(cleanVal(pick(raw, ["test_id", "testid"]))) || testId;
+            const rid =
+              Number(cleanVal(pick(raw, ["test_id", "testid"]))) || testId;
             if (rid !== testId) {
-              skipped++; log(`row ${excelRow} skipped: other test_id=${rid}`); continue;
+              skipped++;
+              log(`row ${excelRow} skipped: other test_id=${rid}`);
+              continue;
             }
 
             // Savol matni
             const question = cleanVal(
               pick(raw, ["question", "question_text", "savol", "questiontext"])
             );
-            if (!question) { skipped++; log(`row ${excelRow} skipped: empty question`); continue; }
+            if (!question) {
+              skipped++;
+              log(`row ${excelRow} skipped: empty question`);
+              continue;
+            }
 
             // To‘g‘ri javob
             const correct = cleanVal(
@@ -435,7 +587,9 @@ router.post(
             }
 
             if (options.length < 2 && !correct) {
-              skipped++; log(`row ${excelRow} skipped: not enough options`); continue;
+              skipped++;
+              log(`row ${excelRow} skipped: not enough options`);
+              continue;
             }
 
             // correct ro‘yxatda yo‘q bo‘lsa – boshiga qo‘shamiz
@@ -444,11 +598,22 @@ router.post(
             if (correct) {
               const target = norm(correct);
               cIdx = options.findIndex((o) => norm(o) === target);
-              if (cIdx === -1) { options.unshift(correct); cIdx = 0; warnings++; log(`row ${excelRow} warn: correct injected at 0`); }
-            } else { cIdx = 0; warnings++; log(`row ${excelRow} warn: empty correct -> option[0] true`); }
+              if (cIdx === -1) {
+                options.unshift(correct);
+                cIdx = 0;
+                warnings++;
+                log(`row ${excelRow} warn: correct injected at 0`);
+              }
+            } else {
+              cIdx = 0;
+              warnings++;
+              log(`row ${excelRow} warn: empty correct -> option[0] true`);
+            }
 
             if (options.length < 2) {
-              skipped++; log(`row ${excelRow} skipped: <2 options after normalize`); continue;
+              skipped++;
+              log(`row ${excelRow} skipped: <2 options after normalize`);
+              continue;
             }
 
             // Savolni yozish
@@ -459,37 +624,59 @@ router.post(
             );
 
             // Variantlarni yozish
-            let wrote = 0, sort = 1;
+            let wrote = 0,
+              sort = 1;
             for (let k = 0; k < options.length; k++) {
-              const isCor = (k === cIdx) ? 1 : 0;
+              const isCor = k === cIdx ? 1 : 0;
               if (haveIsCorrect && haveWeight) {
-                await conn.query(insertOptionSQL, [insQ.insertId, options[k], isCor, sort++, isCor ? 1 : 0]);
+                await conn.query(insertOptionSQL, [
+                  insQ.insertId,
+                  options[k],
+                  isCor,
+                  sort++,
+                  isCor ? 1 : 0,
+                ]);
               } else if (haveIsCorrect && !haveWeight) {
-                await conn.query(insertOptionSQL, [insQ.insertId, options[k], isCor, sort++]);
+                await conn.query(insertOptionSQL, [
+                  insQ.insertId,
+                  options[k],
+                  isCor,
+                  sort++,
+                ]);
               } else {
-                await conn.query(insertOptionSQL, [insQ.insertId, options[k], sort++]);
+                await conn.query(insertOptionSQL, [
+                  insQ.insertId,
+                  options[k],
+                  sort++,
+                ]);
               }
               wrote++;
             }
-            log(`row ${excelRow} -> Q#${insQ.insertId} | options written: ${wrote}`);
+            log(
+              `row ${excelRow} -> Q#${insQ.insertId} | options written: ${wrote}`
+            );
 
             ok++;
           } catch (rowErr) {
-            failed++; rowErrors.push(`row ${excelRow}: ${rowErr.message}`);
+            failed++;
+            rowErrors.push(`row ${excelRow}: ${rowErr.message}`);
             console.error("[BULK XLSX] row error:", rowErr, "raw=", rows[i]);
           }
         }
 
         await conn.commit();
       } catch (txErr) {
-        try { await conn.rollback(); } catch {}
+        try {
+          await conn.rollback();
+        } catch {}
         throw txErr;
       } finally {
         conn.release();
       }
 
       const summary = `✅ Savollar: ${ok} | ⏭ Skip: ${skipped} | ⚠️ Ogohl.: ${warnings} | ❌ Xato: ${failed}`;
-      if (failed) req.flash("error", summary + ". " + rowErrors.slice(0, 5).join(" | "));
+      if (failed)
+        req.flash("error", summary + ". " + rowErrors.slice(0, 5).join(" | "));
       else req.flash("msg", summary);
     } catch (e) {
       console.error("[BULK XLSX] FATAL:", e);
@@ -515,11 +702,50 @@ router.get("/attempts", ensureAuth, async (req, res) => {
 });
 
 // ---- USERS (student flag) ----
+// /web/routes/admin.js yoki sizdagi router faylida
 router.get("/users", ensureAuth, async (req, res) => {
+  const limit = 15;
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const offset = (page - 1) * limit;
+
+  // 1) Sahifadagi yozuvlar
   const [rows] = await pool.query(
-    "SELECT id,tg_id,full_name,username,phone,is_student FROM users ORDER BY id DESC LIMIT 200"
+    `SELECT id, tg_id, full_name, username, phone, is_student
+     FROM users
+     ORDER BY id DESC
+     LIMIT ? OFFSET ?`,
+    [limit, offset]
   );
-  res.render("users", { users: rows });
+
+  // 2) Umumiy son
+  const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM users`);
+
+  const pages = Math.max(1, Math.ceil(total / limit));
+  const hasPrev = page > 1;
+  const hasNext = page < pages;
+
+  // Page raqamlarini ixcham ko‘rsatish (5 ta oynacha)
+  const windowSize = 5;
+  let startPage = Math.max(1, page - Math.floor(windowSize / 2));
+  let endPage = Math.min(pages, startPage + windowSize - 1);
+  if (endPage - startPage + 1 < windowSize) {
+    startPage = Math.max(1, endPage - windowSize + 1);
+  }
+  const pageNumbers = Array.from(
+    { length: endPage - startPage + 1 },
+    (_, i) => startPage + i
+  );
+
+  res.render("users", {
+    users: rows,
+    page,
+    pages,
+    total,
+    limit,
+    hasPrev,
+    hasNext,
+    pageNumbers,
+  });
 });
 
 router.post("/users/:id/toggle-student", ensureAuth, async (req, res) => {
@@ -528,5 +754,93 @@ router.post("/users/:id/toggle-student", ensureAuth, async (req, res) => {
   ]);
   res.redirect("/admin/users");
 });
+
+// routes/admin/leads.js
+router.get("/leads", async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = 15;
+  const offset = (page - 1) * limit;
+
+  const [[{ total }]] = await pool.query("SELECT COUNT(*) as total FROM leads");
+  const [rows] = await pool.query(`
+    SELECT l.*, u.full_name, u.username
+    FROM leads l
+    LEFT JOIN users u ON u.id = l.user_id
+    ORDER BY l.created_at DESC
+    LIMIT ? OFFSET ?
+  `, [limit, offset]);
+
+  const pages = Math.ceil(total / limit);
+  const pageNumbers = Array.from({ length: pages }, (_, i) => i + 1);
+
+  res.render("leads", {
+    leads: rows,
+    total,
+    page,
+    pages,
+    hasPrev: page > 1,
+    hasNext: page < pages,
+    pageNumbers,
+    dayjs
+  });
+});
+
+// Excel eksport route (leads + user phone)
+router.get("/leads/export", async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        l.*,
+        u.full_name,
+        u.username,
+        u.phone AS user_phone
+      FROM leads l
+      LEFT JOIN users u ON u.id = l.user_id
+      ORDER BY l.created_at DESC
+    `);
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Leads");
+
+    // Header
+    ws.addRow([
+      "ID","FIO","Username","Phone (users)","tg_id","source","stage","intent","purpose",
+      "district","group_pref","pref_time","pref_days","note","created_at"
+    ]);
+
+    // Rows
+    rows.forEach(r => {
+      ws.addRow([
+        r.id,
+        r.full_name || "",
+        r.username ? "@" + r.username : "",
+        r.user_phone || "",                 // ← users.phone
+        r.tg_id,
+        r.source,
+        r.stage,
+        r.intent,
+        r.purpose,
+        r.district,
+        r.group_preference,
+        r.preferred_time,
+        r.preferred_days,
+        r.note,                              // ← leads.note (odatda telefon ham bo‘lishi mumkin)
+        dayjs(r.created_at).format("YYYY-MM-DD HH:mm"),
+      ]);
+    });
+
+    // ixtiyoriy: ustunlarni biroz kengaytirish
+    ws.columns.forEach(col => { col.width = Math.min(40, Math.max(12, (col.header + "").length + 2)); });
+
+    res.setHeader("Content-Type","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition","attachment; filename=leads.xlsx");
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (e) {
+    console.error("leads/export error:", e);
+    res.status(500).send("Exportda xatolik yuz berdi.");
+  }
+});
+
 
 module.exports = router;

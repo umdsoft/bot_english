@@ -35,3 +35,37 @@
     </tbody>
   </table>
 </div>
+
+<!-- Pagination -->
+<div class="mt-4 flex items-center justify-between">
+  <div class="text-sm text-gray-600">
+    Jami: <span class="font-medium"><%= total %></span> ta ·
+    Sahifa: <span class="font-medium"><%= page %></span>/<%= pages %>
+  </div>
+
+  <nav class="inline-flex items-center gap-1" aria-label="Pagination">
+    <% if (hasPrev) { %>
+      <a href="?page=1" class="px-3 py-1.5 rounded border hover:bg-gray-50">« Birinchi</a>
+      <a href="?page=<%= page - 1 %>" class="px-3 py-1.5 rounded border hover:bg-gray-50">‹ Oldingi</a>
+    <% } else { %>
+      <span class="px-3 py-1.5 rounded border text-gray-300">« Birinchi</span>
+      <span class="px-3 py-1.5 rounded border text-gray-300">‹ Oldingi</span>
+    <% } %>
+
+    <% pageNumbers.forEach(p => { %>
+      <% if (p === page) { %>
+        <span class="px-3 py-1.5 rounded border bg-gray-900 text-white"><%= p %></span>
+      <% } else { %>
+        <a href="?page=<%= p %>" class="px-3 py-1.5 rounded border hover:bg-gray-50"><%= p %></a>
+      <% } %>
+    <% }) %>
+
+    <% if (hasNext) { %>
+      <a href="?page=<%= page + 1 %>" class="px-3 py-1.5 rounded border hover:bg-gray-50">Keyingi ›</a>
+      <a href="?page=<%= pages %>" class="px-3 py-1.5 rounded border hover:bg-gray-50">Oxirgi »</a>
+    <% } else { %>
+      <span class="px-3 py-1.5 rounded border text-gray-300">Keyingi ›</span>
+      <span class="px-3 py-1.5 rounded border text-gray-300">Oxirgi »</span>
+    <% } %>
+  </nav>
+</div>

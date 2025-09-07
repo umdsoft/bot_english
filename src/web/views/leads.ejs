@@ -1,0 +1,135 @@
+<% layout('layout') -%>
+
+<%
+  // Pref days ko'rsatkichlari uchun label
+  function prefDaysLabel(code) {
+    if (!code) return '';
+    switch (String(code)) {
+      case 'even': return 'Juft kunlari';
+      case 'odd':  return 'Toq kunlari';
+      case 'any':  return 'Har kuni';
+      default:     return code;
+    }
+  }
+%>
+
+<div class="mb-5 flex items-center justify-between gap-3 flex-wrap">
+  <h1 class="text-2xl font-semibold">Leads</h1>
+  <div class="flex items-center gap-2">
+    <a href="/admin/leads/export"
+       class="inline-flex items-center rounded-lg border px-3 py-1.5 bg-white hover:bg-gray-50">
+      ⬇️ Excelga eksport
+    </a>
+  </div>
+</div>
+
+<div class="overflow-hidden rounded-xl border bg-white">
+  <table class="min-w-full divide-y">
+    <thead class="bg-gray-50 text-gray-600 text-sm">
+      <tr>
+        <th class="px-4 py-2 text-left">ID</th>
+        <th class="px-4 py-2 text-left">FIO</th>
+        <th class="px-4 py-2 text-left">Maqsad (purpose)</th>
+        <th class="px-4 py-2 text-left">Tuman (district)</th>
+        <th class="px-4 py-2 text-left">Guruh (group)</th>
+        <th class="px-4 py-2 text-left">Vaqt (pref_time)</th>
+        <th class="px-4 py-2 text-left">Kunlar (pref_days)</th>
+        <th class="px-4 py-2 text-left">Telefon (note)</th>
+        <th class="px-4 py-2 text-left">Ro‘yxatdan o‘tgan</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y">
+      <% if ((leads || []).length === 0) { %>
+        <tr>
+          <td colspan="9" class="px-4 py-6 text-center text-gray-500">Ma’lumot yo‘q</td>
+        </tr>
+      <% } %>
+
+      <% (leads || []).forEach(l => { %>
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2"><%= l.id %></td>
+          <td class="px-4 py-2">
+            <%= l.full_name || '-' %>
+            <% if (l.username) { %>
+              <span class="text-gray-500 ml-1">(@<%= l.username %>)</span>
+            <% } %>
+          </td>
+          <td class="px-4 py-2"><%= l.purpose || '' %></td>
+          <td class="px-4 py-2"><%= l.district || '' %></td>
+          <td class="px-4 py-2"><%= l.group_preference || '' %></td>
+          <td class="px-4 py-2"><%= l.preferred_time || '' %></td>
+          <td class="px-4 py-2"><%= prefDaysLabel(l.preferred_days) %></td>
+          <td class="px-4 py-2"><%= l.note || '' %></td>
+          <td class="px-4 py-2">
+            <%= (dayjs && dayjs(l.created_at).isValid())
+                ? dayjs(l.created_at).format('DD.MM.YYYY HH:mm')
+                : (l.created_at || '') %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination (windowed: faqat 10 ta ko'rinadi) -->
+<div class="mt-4 flex items-center justify-between">
+  <div class="text-sm text-gray-600">
+    Jami: <span class="font-medium"><%= total %></span> ta ·
+    Sahifa: <span class="font-medium"><%= page %></span>/<%= pages %>
+  </div>
+
+  <%
+    // Agar backend yubormasa, hasPrev/hasNext ni hosil qilib olamiz
+    const _hasPrev = (typeof hasPrev !== 'undefined') ? hasPrev : (page > 1);
+    const _hasNext = (typeof hasNext !== 'undefined') ? hasNext : (page < pages);
+
+    // Oynali pagination
+    const WINDOW = 10; // bir vaqtda ko'rinadigan maksimal sahifalar
+    let start = Math.max(1, page - Math.floor(WINDOW / 2));
+    let end = start + WINDOW - 1;
+    if (end > pages) {
+      end = pages;
+      start = Math.max(1, end - WINDOW + 1);
+    }
+  %>
+
+  <nav class="inline-flex items-center gap-1" aria-label="Pagination">
+    <% if (_hasPrev) { %>
+      <a href="?page=1" class="px-3 py-1.5 rounded border hover:bg-gray-50">« Birinchi</a>
+      <a href="?page=<%= page - 1 %>" class="px-3 py-1.5 rounded border hover:bg-gray-50">‹ Oldingi</a>
+    <% } else { %>
+      <span class="px-3 py-1.5 rounded border text-gray-300">« Birinchi</span>
+      <span class="px-3 py-1.5 rounded border text-gray-300">‹ Oldingi</span>
+    <% } %>
+
+    <% if (start > 1) { %>
+      <a href="?page=1" class="px-3 py-1.5 rounded border hover:bg-gray-50">1</a>
+      <% if (start > 2) { %>
+        <span class="px-3 py-1.5 text-gray-400">…</span>
+      <% } %>
+    <% } %>
+
+    <% for (let p = start; p <= end; p++) { %>
+      <% if (p === page) { %>
+        <span class="px-3 py-1.5 rounded border bg-gray-900 text-white"><%= p %></span>
+      <% } else { %>
+        <a href="?page=<%= p %>" class="px-3 py-1.5 rounded border hover:bg-gray-50"><%= p %></a>
+      <% } %>
+    <% } %>
+
+    <% if (end < pages) { %>
+      <% if (end < pages - 1) { %>
+        <span class="px-3 py-1.5 text-gray-400">…</span>
+      <% } %>
+      <a href="?page=<%= pages %>" class="px-3 py-1.5 rounded border hover:bg-gray-50"><%= pages %></a>
+    <% } %>
+
+    <% if (_hasNext) { %>
+      <a href="?page=<%= page + 1 %>" class="px-3 py-1.5 rounded border hover:bg-gray-50">Keyingi ›</a>
+      <a href="?page=<%= pages %>" class="px-3 py-1.5 rounded border hover:bg-gray-50">Oxirgi »</a>
+    <% } else { %>
+      <span class="px-3 py-1.5 rounded border text-gray-300">Keyingi ›</span>
+      <span class="px-3 py-1.5 rounded border text-gray-300">Oxirgi »</span>
+    <% } %>
+  </nav>
+</div>
