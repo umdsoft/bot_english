@@ -1,0 +1,91 @@
+<% layout('layout') -%>
+<h1 class="text-2xl font-semibold mb-5">Fanlar</h1>
+
+<div class="rounded-xl border bg-white p-4 mb-6">
+  <form method="post" action="/admin/courses/subjects" class="grid md:grid-cols-4 gap-3">
+    <input name="name" placeholder="Fan nomi" class="border rounded px-3 py-2" required>
+    <input name="code" placeholder="Kod (ixtiyoriy)" class="border rounded px-3 py-2">
+    <label class="inline-flex items-center gap-2">
+      <input type="checkbox" name="is_active" class="accent-black"> Faol
+    </label>
+    <button class="rounded bg-black text-white px-4 py-2">Qo‘shish</button>
+  </form>
+</div>
+
+<div class="overflow-hidden rounded-xl border bg-white">
+  <table class="min-w-full divide-y">
+    <thead class="bg-gray-50 text-gray-600 text-sm">
+      <tr>
+        <th class="px-4 py-2 text-left">ID</th>
+        <th class="px-4 py-2 text-left">Nomi</th>
+        <th class="px-4 py-2 text-left">Kod</th>
+        <th class="px-4 py-2 text-left">Mavzular</th>
+        <th class="px-4 py-2 text-left">Faol</th>
+        <th class="px-4 py-2 text-right"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y">
+      <% subjects.forEach(s => { %>
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2"><%= s.id %></td>
+          <td class="px-4 py-2">
+            <form method="post" action="/admin/courses/subjects/<%= s.id %>" class="grid md:grid-cols-2 gap-2">
+              <input name="name" value="<%= s.name %>" class="border rounded px-2 py-1">
+              <input name="code" value="<%= s.code || '' %>" class="border rounded px-2 py-1">
+              <label class="inline-flex items-center gap-2">
+                <input type="checkbox" name="is_active" <%= s.is_active ? 'checked' : '' %> class="accent-black"> Faol
+              </label>
+              <button class="rounded border px-3 py-1">Saqlash</button>
+            </form>
+          </td>
+          <td class="px-4 py-2"><%= s.code || '' %></td>
+          <td class="px-4 py-2">
+            <a href="/admin/courses/subjects/<%= s.id %>/topics" class="underline">
+              <%= s.topics_count %> ta
+            </a>
+          </td>
+          <td class="px-4 py-2"><%= s.is_active ? '✅' : '—' %></td>
+          <td class="px-4 py-2 text-right">
+            <form method="post" action="/admin/courses/subjects/<%= s.id %>/toggle" class="inline">
+              <button class="rounded-lg border px-3 py-1.5"><%= s.is_active ? 'O‘chir' : 'Faollashtir' %></button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination (windowed 10) -->
+<div class="mt-4 flex items-center justify-between">
+  <div class="text-sm text-gray-600">
+    Jami: <span class="font-medium"><%= total %></span> ·
+    Sahifa: <span class="font-medium"><%= page %></span>/<%= pages %>
+  </div>
+
+  <nav class="inline-flex items-center gap-1" aria-label="Pagination">
+    <% if (hasPrev) { %>
+      <a href="?page=1" class="px-3 py-1.5 rounded border hover:bg-gray-50">« Birinchi</a>
+      <a href="?page=<%= page - 1 %>" class="px-3 py-1.5 rounded border hover:bg-gray-50">‹ Oldingi</a>
+    <% } else { %>
+      <span class="px-3 py-1.5 rounded border text-gray-300">« Birinchi</span>
+      <span class="px-3 py-1.5 rounded border text-gray-300">‹ Oldingi</span>
+    <% } %>
+
+    <% pageNumbers.forEach(p => { %>
+      <% if (p === page) { %>
+        <span class="px-3 py-1.5 rounded border bg-gray-900 text-white"><%= p %></span>
+      <% } else { %>
+        <a href="?page=<%= p %>" class="px-3 py-1.5 rounded border hover:bg-gray-50"><%= p %></a>
+      <% } %>
+    <% }) %>
+
+    <% if (hasNext) { %>
+      <a href="?page=<%= page + 1 %>" class="px-3 py-1.5 rounded border hover:bg-gray-50">Keyingi ›</a>
+      <a href="?page=<%= pages %>" class="px-3 py-1.5 rounded border hover:bg-gray-50">Oxirgi »</a>
+    <% } else { %>
+      <span class="px-3 py-1.5 rounded border text-gray-300">Keyingi ›</span>
+      <span class="px-3 py-1.5 rounded border text-gray-300">Oxirgi »</span>
+    <% } %>
+  </nav>
+</div>

@@ -40,7 +40,13 @@
           >
             <span>📊</span><span>Natijalar</span>
           </a>
- <a
+          <a
+            href="/admin/courses/subjects"
+            class="flex items-center gap-2 rounded-lg px-3 py-2 <%= (path && path.startsWith('/admin/courses')) ? 'bg-gray-900 text-white' : 'hover:bg-gray-100' %>"
+          >
+            <span>📚 Kurslar</span>
+          </a>
+          <a
             href="/admin/leads"
             class="flex items-center gap-3 px-3 py-2 rounded-lg <%= (_path.startsWith('/admin/leads')) ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100' %>"
           >

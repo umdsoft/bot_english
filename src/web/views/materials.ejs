@@ -1,0 +1,72 @@
+<% layout('layout') -%>
+<h1 class="text-2xl font-semibold mb-1"><%= topic.subject_name %> / <%= topic.title %> — Materiallar</h1>
+<p class="mb-5 text-sm text-gray-600">
+  <a href="/admin/courses/subjects/<%= topic.subject_id %>/topics" class="underline">← Mavzular</a>
+</p>
+
+<div class="rounded-xl border bg-white p-4 mb-6">
+  <form method="post" enctype="multipart/form-data" action="/admin/courses/topics/<%= topic.id %>/materials" class="grid md:grid-cols-6 gap-3">
+    <select name="type" class="border rounded px-3 py-2">
+      <option value="text">Matn</option>
+      <option value="link">Link</option>
+      <option value="pdf">PDF</option>
+      <option value="video">Video</option>
+    </select>
+    <input name="title" placeholder="Sarlavha" class="border rounded px-3 py-2" required>
+    <input name="url" placeholder="URL (link/video)" class="border rounded px-3 py-2">
+    <input name="file" type="file" class="border rounded px-3 py-2">
+    <input name="order_no" type="number" placeholder="Tartib" class="border rounded px-3 py-2">
+    <label class="inline-flex items-center gap-2">
+      <input type="checkbox" name="is_active" class="accent-black"> Faol
+    </label>
+    <textarea name="text" placeholder="Matn…" class="border rounded px-3 py-2 md:col-span-6"></textarea>
+    <input name="duration_sec" type="number" placeholder="Video davomiyligi (sek)" class="border rounded px-3 py-2">
+    <button class="rounded bg-black text-white px-4 py-2 md:col-span-5">Qo‘shish</button>
+  </form>
+</div>
+
+<div class="overflow-hidden rounded-xl border bg-white">
+  <table class="min-w-full divide-y">
+    <thead class="bg-gray-50 text-gray-600 text-sm">
+      <tr>
+        <th class="px-4 py-2 text-left">ID</th>
+        <th class="px-4 py-2 text-left">Turi</th>
+        <th class="px-4 py-2 text-left">Sarlavha</th>
+        <th class="px-4 py-2 text-left">Tartib</th>
+        <th class="px-4 py-2 text-left">Faol</th>
+        <th class="px-4 py-2 text-right"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y">
+      <% materials.forEach(m => { %>
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2"><%= m.id %></td>
+          <td class="px-4 py-2"><%= m.type %></td>
+          <td class="px-4 py-2">
+            <form method="post" enctype="multipart/form-data" action="/admin/courses/materials/<%= m.id %>" class="grid md:grid-cols-3 gap-2">
+              <select name="type" class="border rounded px-2 py-1">
+                <option value="text" <%= m.type==='text'?'selected':'' %>>Matn</option>
+                <option value="link" <%= m.type==='link'?'selected':'' %>>Link</option>
+                <option value="pdf" <%= m.type==='pdf'?'selected':'' %>>PDF</option>
+                <option value="video" <%= m.type==='video'?'selected':'' %>>Video</option>
+              </select>
+              <input name="title" value="<%= m.title || '' %>" class="border rounded px-2 py-1">
+              <input name="url" value="<%= m.url || '' %>" class="border rounded px-2 py-1">
+              <input name="file" type="file" class="border rounded px-2 py-1">
+              <input name="order_no" type="number" value="<%= m.order_no || 0 %>" class="border rounded px-2 py-1">
+              <label class="inline-flex items-center gap-2">
+                <input type="checkbox" name="is_active" <%= m.is_active ? 'checked' : '' %> class="accent-black"> Faol
+              </label>
+              <textarea name="text" class="border rounded px-2 py-1 md:col-span-3"><%= m.text || '' %></textarea>
+              <input name="duration_sec" type="number" value="<%= m.duration_sec || '' %>" class="border rounded px-2 py-1">
+              <button class="rounded border px-3 py-1 md:col-span-2">Saqlash</button>
+            </form>
+          </td>
+          <td class="px-4 py-2"><%= m.order_no || 0 %></td>
+          <td class="px-4 py-2"><%= m.is_active ? '✅' : '—' %></td>
+          <td class="px-4 py-2 text-right"></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>

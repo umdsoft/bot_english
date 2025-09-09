@@ -21,7 +21,7 @@ const {
 const { generateResultPDF } = require("./services/pdf");
 const { awardPointsForTest } = require("./services/points");
 const { askPhoneKeyboard } = require("./keyboards");
-
+const { registerCourseFlow } = require("./handlers/courseFlow");
 // Handlers & middlewares
 const { registerStart } = require("./handlers/start");
 const { registerInfo } = require("./handlers/info");
@@ -32,7 +32,6 @@ const { resumePrompt } = require("./middlewares/resumePrompt");
 
 // ⬅️ Kanal relay handler (kanal postiga reply qilib nusxalash)
 const { registerChannelRelay } = require("./handlers/channelRelay");
-
 
 let wired = false; // handlerlar ikki marta registratsiya bo‘lib ketmasin
 let launched = false;
@@ -61,7 +60,9 @@ async function sendNextQuestion(ctx, testId, attemptId) {
 
     const caption =
       `✅ Test yakunlandi\n` +
-      `👤 ${summary.full_name || "-"} ${summary.username ? "(@" + summary.username + ")" : ""}\n` +
+      `👤 ${summary.full_name || "-"} ${
+        summary.username ? "(@" + summary.username + ")" : ""
+      }\n` +
       `📱 ${summary.phone || "-"}\n` +
       `🧪 ${summary.test_name}\n` +
       `📊 ${res.percent}% | ${res.level} | ✅ ${res.correctCount} | ❌ ${res.wrongCount}\n` +
@@ -83,7 +84,8 @@ async function sendNextQuestion(ctx, testId, attemptId) {
         ctx.chat.id,
         attemptId,
         { correctCount: res.correctCount, wrongCount: res.wrongCount },
-        "ℹ️ Kanalga yuborishda muammo bo‘ldi, fayl sizga yuborildi.\n\n" + caption
+        "ℹ️ Kanalga yuborishda muammo bo‘ldi, fayl sizga yuborildi.\n\n" +
+          caption
       );
     }
 
@@ -147,6 +149,7 @@ async function wireUp() {
   registerStart(bot);
   registerInfo(bot);
   registerTestFlow(bot, { sendNextQuestion, askPhoneKeyboard });
+  registerCourseFlow(bot, { sendNextQuestion, askPhoneKeyboard });
   registerLead(bot);
   registerAdmin(bot);
   bot.use(resumePrompt);
@@ -156,7 +159,19 @@ async function wireUp() {
 
   wired = true;
 }
-
+bot.command("menu", async (ctx) => {
+  const tgId = ctx.from.id;
+  const [[u]] = await pool.query("SELECT is_student FROM users WHERE tg_id=?", [
+    tgId,
+  ]);
+  const rows = [
+    [Markup.button.text("📝 Testni boshlash")], // placement
+  ];
+  if (u?.is_student) {
+    rows.push([Markup.button.text("📚 Kurslarim")]); // kurs oqimi
+  }
+  return ctx.reply("Menyu:", Markup.keyboard(rows).resize());
+});
 bot.on("callback_query", async (ctx, next) => {
   const data = ctx.callbackQuery?.data || "";
 
@@ -188,7 +203,10 @@ bot.on("callback_query", async (ctx, next) => {
 
       await sendNextQuestion(ctx, att.test_id, attemptId);
     } catch (e) {
-      console.error("callback 'ans:' error:", e?.description || e?.message || e);
+      console.error(
+        "callback 'ans:' error:",
+        e?.description || e?.message || e
+      );
     }
 
     return; // shu yerda tugatamiz

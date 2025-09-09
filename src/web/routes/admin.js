@@ -773,6 +773,7 @@ router.get("/leads", async (req, res) => {
   const pages = Math.ceil(total / limit);
   const pageNumbers = Array.from({ length: pages }, (_, i) => i + 1);
 
+  
   res.render("leads", {
     leads: rows,
     total,

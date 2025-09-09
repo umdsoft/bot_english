@@ -1,0 +1,41 @@
+<% layout('layout') -%>
+<h1 class="text-2xl font-semibold mb-1"><%= topic.subject_name %> / <%= topic.title %> — Testlar</h1>
+<p class="mb-5 text-sm text-gray-600">
+  <a href="/admin/courses/subjects/<%= topic.subject_id %>/topics" class="underline">← Mavzular</a>
+</p>
+
+<div class="rounded-xl border bg-white p-4 mb-6">
+  <form method="post" action="/admin/courses/topics/<%= topic.id %>/tests" class="grid md:grid-cols-4 gap-3">
+    <input name="name" placeholder="Test nomi" class="border rounded px-3 py-2" required>
+    <input name="code" placeholder="Kod (ixtiyoriy)" class="border rounded px-3 py-2">
+    <span></span>
+    <button class="rounded bg-black text-white px-4 py-2">Qo‘shish</button>
+  </form>
+</div>
+
+<div class="overflow-hidden rounded-xl border bg-white">
+  <table class="min-w-full divide-y">
+    <thead class="bg-gray-50 text-gray-600 text-sm">
+      <tr>
+        <th class="px-4 py-2 text-left">ID</th>
+        <th class="px-4 py-2 text-left">Test</th>
+        <th class="px-4 py-2 text-left">Kod</th>
+        <th class="px-4 py-2 text-left">Faol</th>
+        <th class="px-4 py-2 text-right"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y">
+      <% tests.forEach(t => { %>
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2"><%= t.id %></td>
+          <td class="px-4 py-2"><%= t.name %></td>
+          <td class="px-4 py-2"><%= t.code || '' %></td>
+          <td class="px-4 py-2"><%= t.is_active ? '✅' : '—' %></td>
+          <td class="px-4 py-2 text-right">
+            <a href="/admin/tests/<%= t.id %>" class="underline">Tahrirlash</a>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>

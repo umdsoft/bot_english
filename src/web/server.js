@@ -55,6 +55,7 @@ app.use("/assets", express.static(path.join(__dirname, "..", "..", "assets")));
 // routes
 app.use("/admin", adminRoutes);
 app.use("/exam", require("./routes/exam"));
+app.use("/admin/courses", require("./routes/adminCourses"));
 // 404
 app.use((req, res) => res.status(404).send("Not Found"));
 

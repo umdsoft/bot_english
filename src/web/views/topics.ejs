@@ -1,0 +1,57 @@
+<% layout('layout') -%>
+<h1 class="text-2xl font-semibold mb-2"><%= subject.name %> — Mavzular</h1>
+<p class="mb-5 text-sm text-gray-600"><a href="/admin/courses/subjects" class="underline">← Fanlar</a></p>
+
+<div class="rounded-xl border bg-white p-4 mb-6">
+  <form method="post" action="/admin/courses/subjects/<%= subject.id %>/topics" class="grid md:grid-cols-5 gap-3">
+    <input name="title" placeholder="Mavzu nomi" class="border rounded px-3 py-2" required>
+    <input name="order_no" type="number" placeholder="Tartib" class="border rounded px-3 py-2">
+    <label class="inline-flex items-center gap-2">
+      <input type="checkbox" name="is_active" class="accent-black"> Faol
+    </label>
+    <span></span>
+    <button class="rounded bg-black text-white px-4 py-2">Qo‘shish</button>
+  </form>
+</div>
+
+<div class="overflow-hidden rounded-xl border bg-white">
+  <table class="min-w-full divide-y">
+    <thead class="bg-gray-50 text-gray-600 text-sm">
+      <tr>
+        <th class="px-4 py-2 text-left">ID</th>
+        <th class="px-4 py-2 text-left">Mavzu</th>
+        <th class="px-4 py-2 text-left">Tartib</th>
+        <th class="px-4 py-2 text-left">Faol</th>
+        <th class="px-4 py-2 text-left">Materiallar</th>
+        <th class="px-4 py-2 text-left">Testlar</th>
+        <th class="px-4 py-2 text-right"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y">
+      <% topics.forEach(t => { %>
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2"><%= t.id %></td>
+          <td class="px-4 py-2">
+            <form method="post" action="/admin/courses/topics/<%= t.id %>" class="grid md:grid-cols-2 gap-2">
+              <input name="title" value="<%= t.title %>" class="border rounded px-2 py-1">
+              <input name="order_no" type="number" value="<%= t.order_no || 0 %>" class="border rounded px-2 py-1">
+              <label class="inline-flex items-center gap-2">
+                <input type="checkbox" name="is_active" <%= t.is_active ? 'checked' : '' %> class="accent-black"> Faol
+              </label>
+              <button class="rounded border px-3 py-1">Saqlash</button>
+            </form>
+          </td>
+          <td class="px-4 py-2"><%= t.order_no || 0 %></td>
+          <td class="px-4 py-2"><%= t.is_active ? '✅' : '—' %></td>
+          <td class="px-4 py-2">
+            <a href="/admin/courses/topics/<%= t.id %>/materials" class="underline">Materiallar</a>
+          </td>
+          <td class="px-4 py-2">
+            <a href="/admin/courses/topics/<%= t.id %>/tests" class="underline">Testlar</a>
+          </td>
+          <td class="px-4 py-2 text-right"></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
