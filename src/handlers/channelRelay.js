@@ -3,7 +3,7 @@ const {
   getAllSubscribersFromDB,
   deleteUserByTgId,
 } = require("../services/subscribers.db");
-
+const { copySafe } = require("../lib/telegram");
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }

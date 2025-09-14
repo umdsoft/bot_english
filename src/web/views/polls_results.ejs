@@ -1,0 +1,23 @@
+<% layout('layout') -%>
+<h1 class="text-2xl font-semibold mb-5">Natijalar: <%= poll.title %></h1>
+
+<div class="overflow-hidden rounded-xl border bg-white">
+  <table class="min-w-full divide-y">
+    <thead class="bg-gray-50 text-gray-600 text-sm">
+      <tr>
+        <th class="px-4 py-2 text-left">Variant</th>
+        <th class="px-4 py-2 text-left">Ovozlar</th>
+        <th class="px-4 py-2 text-left">Foiz</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y">
+      <% opts.forEach(o => { const p = total ? (o.votes*100/total) : 0; %>
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2"><%= o.text %></td>
+          <td class="px-4 py-2"><%= o.votes %></td>
+          <td class="px-4 py-2"><%= p.toFixed(1) %>%</td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>

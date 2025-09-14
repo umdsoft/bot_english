@@ -53,36 +53,40 @@ router.get("/logout", ensureAuth, (req, res) => {
 // ---- DASHBOARD ----
 router.get("/", ensureAuth, async (req, res) => {
   const groupOrder = [
-    'Beginner','Elementary','Pre-Intermediate','Intermediate',
-    'Upper-Intermediate','Advanced','IELTS','CEFR'
+    "Beginner","Elementary","Pre-Intermediate","Intermediate",
+    "Upper-Intermediate","Advanced","IELTS","CEFR"
   ];
 
+  // Statlar
   const [[cUsers]]    = await pool.query("SELECT COUNT(*) AS c FROM users");
   const [[cTests]]    = await pool.query("SELECT COUNT(*) AS c FROM tests");
   const [[cAttempts]] = await pool.query("SELECT COUNT(*) AS c FROM attempts");
 
+  // Bugungi ko'rsatkichlar (har bir urinishni 0..100 oralig'iga clip qilib, so'ngra AVG)
   const [[today]] = await pool.query(`
-    SELECT COUNT(*) AS count, AVG(percent) AS avg_percent
-    FROM attempts
-    WHERE status='completed' AND DATE(started_at)=CURDATE()
+    SELECT
+      COUNT(*) AS count,
+      AVG(LEAST(GREATEST(a.percent,0),100)) AS avg_percent
+    FROM attempts a
+    WHERE a.status='completed' AND DATE(a.started_at)=CURDATE()
   `);
 
-  // tests.code asosida guruhlash (BEGINNER/ELEMENTARY/...)
+  // Darajaga ajratish (tests.code dan), PIE uchun o'rtacha %
   const [byGroup] = await pool.query(`
     SELECT
       CASE
-        WHEN LOWER(t.code) LIKE '%beginner%'               THEN 'Beginner'
-        WHEN LOWER(t.code) LIKE '%elementary%'             THEN 'Elementary'
-        WHEN LOWER(t.code) REGEXP 'pre[-_ ]?intermediate'  THEN 'Pre-Intermediate'
+        WHEN LOWER(t.code) LIKE '%beginner%'                THEN 'Beginner'
+        WHEN LOWER(t.code) LIKE '%elementary%'              THEN 'Elementary'
+        WHEN LOWER(t.code) REGEXP 'pre[-_ ]?intermediate'   THEN 'Pre-Intermediate'
         WHEN LOWER(t.code) REGEXP 'upper[-_ ]?intermediate' THEN 'Upper-Intermediate'
-        WHEN LOWER(t.code) LIKE '%intermediate%'           THEN 'Intermediate'
-        WHEN LOWER(t.code) LIKE '%advanced%'               THEN 'Advanced'
-        WHEN LOWER(t.code) LIKE '%ielts%'                  THEN 'IELTS'
-        WHEN LOWER(t.code) LIKE '%cefr%'                   THEN 'CEFR'
+        WHEN LOWER(t.code) LIKE '%intermediate%'            THEN 'Intermediate'
+        WHEN LOWER(t.code) LIKE '%advanced%'                THEN 'Advanced'
+        WHEN LOWER(t.code) LIKE '%ielts%'                   THEN 'IELTS'
+        WHEN LOWER(t.code) LIKE '%cefr%'                    THEN 'CEFR'
         ELSE 'Other'
       END AS gname,
       COUNT(*) AS cnt,
-      AVG(a.percent) AS avg_percent
+      AVG(LEAST(GREATEST(a.percent,0),100)) AS avg_percent
     FROM attempts a
     JOIN tests t ON t.id = a.test_id
     WHERE a.status='completed'
@@ -90,66 +94,72 @@ router.get("/", ensureAuth, async (req, res) => {
   `);
 
   const m = new Map(byGroup.map(r => [r.gname, r]));
-  // PIE uchun faqat avg % kerak (nol bo‘lgan guruhlarni ham ko‘rsatamiz, lekin xohlasaq filtrlaymiz)
   const chartPie = {
     labels: groupOrder,
-    averages: groupOrder.map(n => Number(m.get(n)?.avg_percent || 0)),
-    counts: groupOrder.map(n => Number(m.get(n)?.cnt || 0)) // tooltip’da foydali
+    // 0..100 oralig'iga siqib qo'yamiz
+    averages: groupOrder.map(n => {
+      const v = Number(m.get(n)?.avg_percent || 0);
+      return Math.max(0, Math.min(100, v));
+    }),
+    counts: groupOrder.map(n => Number(m.get(n)?.cnt || 0))
   };
 
-  // --- TOP-5 bir xil qoladi (oldingi koddan) ---
+  // TOP-5: foydalanuvchi daraja bo'yicha o'rtacha % (AVG) -> har darajadan eng yuqori 5 ta
   const [topRows] = await pool.query(`
-    SELECT * FROM (
+    WITH base AS (
       SELECT
         CASE
-          WHEN LOWER(t.code) LIKE '%beginner%'               THEN 'Beginner'
-          WHEN LOWER(t.code) LIKE '%elementary%'             THEN 'Elementary'
-          WHEN LOWER(t.code) REGEXP 'pre[-_ ]?intermediate'  THEN 'Pre-Intermediate'
+          WHEN LOWER(t.code) LIKE '%beginner%'                THEN 'Beginner'
+          WHEN LOWER(t.code) LIKE '%elementary%'              THEN 'Elementary'
+          WHEN LOWER(t.code) REGEXP 'pre[-_ ]?intermediate'   THEN 'Pre-Intermediate'
           WHEN LOWER(t.code) REGEXP 'upper[-_ ]?intermediate' THEN 'Upper-Intermediate'
-          WHEN LOWER(t.code) LIKE '%intermediate%'           THEN 'Intermediate'
-          WHEN LOWER(t.code) LIKE '%advanced%'               THEN 'Advanced'
-          WHEN LOWER(t.code) LIKE '%ielts%'                  THEN 'IELTS'
-          WHEN LOWER(t.code) LIKE '%cefr%'                   THEN 'CEFR'
+          WHEN LOWER(t.code) LIKE '%intermediate%'            THEN 'Intermediate'
+          WHEN LOWER(t.code) LIKE '%advanced%'                THEN 'Advanced'
+          WHEN LOWER(t.code) LIKE '%ielts%'                   THEN 'IELTS'
+          WHEN LOWER(t.code) LIKE '%cefr%'                    THEN 'CEFR'
           ELSE 'Other'
         END AS gname,
-        a.user_id, u.full_name, u.username, a.percent,
-        ROW_NUMBER() OVER (
-          PARTITION BY
-            CASE
-              WHEN LOWER(t.code) LIKE '%beginner%'               THEN 'Beginner'
-              WHEN LOWER(t.code) LIKE '%elementary%'             THEN 'Elementary'
-              WHEN LOWER(t.code) REGEXP 'pre[-_ ]?intermediate'  THEN 'Pre-Intermediate'
-              WHEN LOWER(t.code) REGEXP 'upper[-_ ]?intermediate' THEN 'Upper-Intermediate'
-              WHEN LOWER(t.code) LIKE '%intermediate%'           THEN 'Intermediate'
-              WHEN LOWER(t.code) LIKE '%advanced%'               THEN 'Advanced'
-              WHEN LOWER(t.code) LIKE '%ielts%'                  THEN 'IELTS'
-              WHEN LOWER(t.code) LIKE '%cefr%'                   THEN 'CEFR'
-              ELSE 'Other'
-            END
-          ORDER BY a.percent DESC
-        ) AS rn
+        a.user_id,
+        AVG(LEAST(GREATEST(a.percent,0),100)) AS avg_percent
       FROM attempts a
       JOIN tests t ON t.id = a.test_id
-      LEFT JOIN users u ON u.id = a.user_id
       WHERE a.status='completed'
-    ) x
-    WHERE x.rn <= 5
-    ORDER BY FIELD(gname, ${groupOrder.map(s => pool.escape(s)).join(', ')}), rn
+      GROUP BY gname, a.user_id
+    ),
+    ranked AS (
+      SELECT
+        b.gname, b.user_id, b.avg_percent,
+        u.full_name, u.username,
+        ROW_NUMBER() OVER (PARTITION BY b.gname ORDER BY b.avg_percent DESC) AS rn
+      FROM base b
+      LEFT JOIN users u ON u.id = b.user_id
+    )
+    SELECT *
+    FROM ranked
+    WHERE rn <= 5
+    ORDER BY FIELD(gname, ${groupOrder.map(s => pool.escape(s)).join(", ")}), rn;
   `);
 
   const top5 = groupOrder.reduce((acc, g) => (acc[g] = [], acc), {});
-  for (const r of topRows) top5[r.gname]?.push(r);
+  for (const r of topRows) {
+    // ehtiyot chorasi: 0..100 oralig'iga clamp
+    r.percent = Math.max(0, Math.min(100, Number(r.avg_percent || 0)));
+    top5[r.gname]?.push(r);
+  }
 
   res.render("dashboard", {
     user: req.session.adminUser,
     stats: { users: cUsers.c, tests: cTests.c, attempts: cAttempts.c },
-    today: { count: Number(today.count || 0), avg_percent: Number(today.avg_percent || 0) },
-    // pie uchun
+    today: {
+      count: Number(today.count || 0),
+      avg_percent: Math.max(0, Math.min(100, Number(today.avg_percent || 0)))
+    },
     chartPie,
     levels: groupOrder,
     top5
   });
 });
+
 
 
 // ---- TESTS CRUD ----

@@ -11,7 +11,30 @@ process.env.TZ = TZ;
 const fs = require("fs");
 const { sendResultPDF } = require("./services/pdf"); // pdf.js dan
 const bot = new Telegraf(process.env.BOT_TOKEN);
+bot.catch((err, ctx) => {
+  const code = err?.response?.error_code;
+  const desc = err?.response?.description || err?.description || err?.message;
 
+  if (code === 403 || code === 400 || code === 401) {
+    console.warn("tg soft error:", code, desc, "chat:", ctx?.chat?.id);
+    return; // protsess to‘xtamasin
+  }
+  console.error("bot.catch fatal:", err);
+});
+
+process.on("unhandledRejection", (reason) => {
+  const code = reason?.response?.error_code;
+  const desc = reason?.response?.description || reason?.message;
+  if (code === 403 || code === 400 || code === 401) {
+    console.warn("unhandledRejection tg soft error:", code, desc);
+    return;
+  }
+  console.error("unhandledRejection:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("uncaughtException:", err);
+});
 const {
   getNextQuestion,
   getOptions,
@@ -29,10 +52,10 @@ const { registerTestFlow } = require("./handlers/testFlow");
 const { registerLead } = require("./handlers/leads");
 const { registerAdmin } = require("./handlers/admin");
 const { resumePrompt } = require("./middlewares/resumePrompt");
-
+const { registerPolls } = require("./handlers/polls");
 // ⬅️ Kanal relay handler (kanal postiga reply qilib nusxalash)
 const { registerChannelRelay } = require("./handlers/channelRelay");
-
+const { registerPollBotHandlers } = require("./handlers/polls.bot");
 let wired = false; // handlerlar ikki marta registratsiya bo‘lib ketmasin
 let launched = false;
 
@@ -151,11 +174,13 @@ async function wireUp() {
   registerTestFlow(bot, { sendNextQuestion, askPhoneKeyboard });
   registerCourseFlow(bot, { sendNextQuestion, askPhoneKeyboard });
   registerLead(bot);
+  registerPollBotHandlers(bot);
   registerAdmin(bot);
   bot.use(resumePrompt);
 
   // ⬅️ Kanalga post joylanganda, bot o‘sha postga reply qilib nusxa qoldiradi
   registerChannelRelay(bot);
+  registerPolls(bot);
 
   wired = true;
 }
@@ -218,7 +243,7 @@ bot.on("callback_query", async (ctx, next) => {
 async function startBot() {
   await wireUp();
 
-  // /start, /menu, /help komandalarini set qilish
+  // /start, /menu, /help komandalarini set qilishdd
   try {
     await bot.telegram.setMyCommands([
       { command: "start", description: "Boshlash" },

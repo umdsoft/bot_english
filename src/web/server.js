@@ -50,12 +50,18 @@ app.use((req, res, next) => {
   next();
 });
 // static (logo va h.k.)
+// Barcha admin routelardan oldin qo'yiladi
+app.use((req, res, next) => {
+  res.locals.cur = req.originalUrl || "";
+  next();
+});
 app.use("/assets", express.static(path.join(__dirname, "..", "..", "assets")));
 
 // routes
 app.use("/admin", adminRoutes);
 app.use("/exam", require("./routes/exam"));
 app.use("/admin/courses", require("./routes/adminCourses"));
+app.use("/admin/polls", require("./routes/admin.polls"));
 // 404
 app.use((req, res) => res.status(404).send("Not Found"));
 

@@ -1,0 +1,146 @@
+<% layout('layout') -%>
+<h1 class="text-2xl font-semibold mb-4">
+  So‘rovnoma: <span class="font-normal"><%= poll.title %></span>
+</h1>
+
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  <!-- PIE CHART -->
+  <div class="rounded-xl border bg-white p-5">
+    <div class="text-sm text-gray-500 mb-2">Variantlar bo‘yicha taqsimot</div>
+    <canvas id="pollPie" height="200"></canvas>
+  </div>
+
+  <!-- Yon panel: % va sonlar -->
+  <div class="rounded-xl border bg-white p-5">
+    <div class="text-sm text-gray-500 mb-2">Statistika</div>
+
+    <div class="mb-3">
+      <div class="text-gray-600">Umumiy qatnashchilar (noyob): <span class="text-2xl font-bold"><%= totalVoters %></span></div>
+      <br>
+<% if (poll.body) { %>
+  <p class="mb-4 text-gray-600 font-bold"><%= poll.body %></p>
+<% } %>
+    </div>
+   
+    <div class="space-y-2">
+      <% (dist || []).forEach((o, i) => {
+          const v = Number(o.voters || 0);
+          const p = totalVoters ? (v * 100 / totalVoters) : 0;
+      %>
+        <div class="flex items-center justify-between">
+          <div class="truncate pr-3"><%= o.text %></div>
+          <div class="whitespace-nowrap text-sm text-gray-700">
+            <span class="font-semibold"><%= v %></span> ta
+            <span class="text-gray-500">(<%= p.toFixed(1) %>%)</span>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+</div>
+
+<!-- VOTERS TABLE -->
+<div class="rounded-xl border bg-white mt-6 overflow-hidden">
+  <div class="px-5 py-3 border-b text-gray-600 text-sm">
+    Ovoz berganlar ro‘yxati
+  </div>
+
+  <table class="min-w-full divide-y">
+    <thead class="bg-gray-50 text-gray-600 text-sm">
+      <tr>
+        <th class="px-4 py-2 text-left">ID</th>
+        <th class="px-4 py-2 text-left">FIO</th>
+        <th class="px-4 py-2 text-left">Username</th>
+        <th class="px-4 py-2 text-left">Telefon</th>
+        <th class="px-4 py-2 text-left">Javob</th>
+        <th class="px-4 py-2 text-left">Vaqt</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y">
+      <% (voters || []).forEach(v => { %>
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2"><%= v.id %></td>
+          <td class="px-4 py-2">
+            <%= v.full_name || ('tg:'+v.tg_id) %>
+          </td>
+          <td class="px-4 py-2">
+            <% if (v.username) { %>@<%= v.username %><% } %>
+          </td>
+          <td class="px-4 py-2"><%= v.phone || '' %></td>
+          <td class="px-4 py-2"><%= v.answer || '' %></td>
+         <td class="px-4 py-2"><%= v.created_fmt || v.created_at || '' %></td>
+        </tr>
+      <% }) %>
+      <% if (!(voters || []).length) { %>
+        <tr>
+          <td colspan="6" class="px-4 py-6 text-center text-gray-500">
+            Hali ovoz yo‘q.
+          </td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+
+  <!-- Pagination -->
+  <div class="px-5 py-3 flex items-center justify-end gap-2">
+    <% const q = new URLSearchParams(Object.fromEntries(
+         Object.entries(query||{}).filter(([k]) => k!=='page'))); %>
+    <% if (page > 1) { q.set('page', page-1); %>
+      <a class="px-3 py-1.5 rounded border hover:bg-gray-50" href="?<%= q.toString() %>">Oldingi</a>
+    <% } else { %>
+      <span class="px-3 py-1.5 rounded border text-gray-300">Oldingi</span>
+    <% } %>
+
+    <span class="px-3 text-sm text-gray-600">Sahifa <%= page %> / <%= pages %></span>
+
+    <% if (page < pages) { q.set('page', page+1); %>
+      <a class="px-3 py-1.5 rounded border hover:bg-gray-50" href="?<%= q.toString() %>">Keyingi</a>
+    <% } else { %>
+      <span class="px-3 py-1.5 rounded border text-gray-300">Keyingi</span>
+    <% } %>
+  </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<script>
+  (function(){
+    const labels = <%- JSON.stringify((dist||[]).map(o => o.text)) %>;
+    const values = <%- JSON.stringify((dist||[]).map(o => Number(o.voters||0))) %>;
+    const total  = <%- Number(totalVoters||0) %>;
+    const perc   = total ? values.map(v => +(v*100/total).toFixed(1)) : values.map(_=>0);
+
+    const colors = ['#60a5fa','#34d399','#f472b6','#fbbf24','#a78bfa','#f87171','#22d3ee','#4ade80','#f59e0b','#c084fc']
+                    .slice(0, labels.length);
+
+    const ctx = document.getElementById('pollPie');
+    new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Ovozlar',
+          data: values,
+          backgroundColor: colors,
+          borderWidth: 1
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: function(item) {
+                const v = values[item.dataIndex] || 0;
+                const p = perc[item.dataIndex] || 0;
+                return ` ${labels[item.dataIndex]}: ${v} ta (${p}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  })();
+</script>

@@ -1,0 +1,92 @@
+<% layout('layout') -%>
+<h1 class="text-2xl font-semibold mb-5">So‘rovnomalar</h1>
+
+<% if (typeof flash !== 'undefined' && flash) { %>
+  <div class="mb-4 rounded-lg bg-emerald-50 text-emerald-800 px-4 py-2 text-sm">
+    <%= flash %>
+  </div>
+<% } %>
+
+<div class="mb-4">
+  <a href="/admin/polls/new"
+     class="inline-flex items-center rounded-lg border px-3 py-1.5 bg-white hover:bg-gray-50">
+    ➕ Yangi so‘rovnoma
+  </a>
+</div>
+
+<div class="overflow-hidden rounded-xl border bg-white">
+  <table class="min-w-full divide-y">
+    <thead class="bg-gray-50 text-gray-600 text-sm">
+      <tr>
+        <th class="px-4 py-2 text-left">ID</th>
+        <th class="px-4 py-2 text-left">Sarlavha</th>
+        <th class="px-4 py-2 text-left">Target</th>
+        <th class="px-4 py-2 text-left">Multi?</th>
+        <th class="px-4 py-2 text-left">Faol?</th>
+        <th class="px-4 py-2 text-left">Ovozlar</th>
+        <th class="px-4 py-2 text-right">Amallar</th>
+      </tr>
+    </thead>
+
+    <tbody class="divide-y">
+      <% if (!polls || !polls.length) { %>
+        <tr>
+          <td colspan="7" class="px-4 py-6 text-center text-gray-500">
+            Hozircha so‘rovnoma yo‘q.
+          </td>
+        </tr>
+      <% } %>
+
+      <% (polls || []).forEach(p => { %>
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2"><%= p.id %></td>
+
+          <td class="px-4 py-2">
+           <td class="px-4 py-2">
+  <div class="font-medium">
+    <a href="/admin/polls/<%= p.id %>" class="hover:underline"><%= p.title %></a>
+  </div>
+  <% if (p.description) { %>
+    <div class="text-sm text-gray-500 truncate max-w-[520px]"><%= p.description %></div>
+  <% } %>
+</td>
+          </td>
+
+          <td class="px-4 py-2"><%= p.target || 'all' %></td>
+          <td class="px-4 py-2"><%= p.is_multi ? '✅' : '—' %></td>
+
+          <td class="px-4 py-2">
+            <% if (p.is_active) { %>
+              <span class="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 text-xs">Aktiv</span>
+            <% } else { %>
+              <span class="inline-flex items-center rounded-full bg-gray-100 text-gray-600 px-2 py-0.5 text-xs">Passiv</span>
+            <% } %>
+          </td>
+
+          <td class="px-4 py-2"><%= p.votes || 0 %></td>
+
+          <td class="px-4 py-2 text-right space-x-2">
+            <% if (!p.is_active) { %>
+              <form class="inline" method="post" action="/admin/polls/<%= p.id %>/activate"
+                    onsubmit="return confirm('Ushbu so‘rovnomani aktivlashtirasiz va tarqatilsinmi?')">
+                <button class="rounded-lg bg-emerald-600 text-white px-3 py-1.5">Aktivlashtir</button>
+              </form>
+            <% } else { %>
+              <form class="inline" method="post" action="/admin/polls/<%= p.id %>/deactivate"
+                    onsubmit="return confirm('So‘rovnomani deaktivlashtirasizmi?')">
+                <button class="rounded-lg bg-gray-700 text-white px-3 py-1.5">Deaktiv</button>
+              </form>
+
+              <form class="inline" method="post" action="/admin/polls/<%= p.id %>/publish"
+                    onsubmit="return confirm('Faqat qatnashmaganlarga yana yuborilsinmi?')">
+                <button class="rounded-lg bg-blue-600 text-white px-3 py-1.5">
+                  Chiqarish (qatnashmaganlarga)
+                </button>
+              </form>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>

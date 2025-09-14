@@ -170,7 +170,7 @@ function registerLead(bot) {
         userId: u?.id || null,
         tgId,
         phone: data.phone,
-        reason: data.reason,
+        reason: data.reason || null,
         district: data.district,
         group: data.group,
         timeSlot: data.time_slot,
