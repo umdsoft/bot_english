@@ -35,10 +35,18 @@ function onePerRowButtons(options, pollId) {
   ]));
 }
 
-async function getActivePollWithOptions() {
-  const [[poll]] = await pool.query(
-    `SELECT * FROM polls WHERE is_active=1 ORDER BY id DESC LIMIT 1`
-  );
+async function getActivePollWithOptions(pollId = null) {
+  let pollQuery =
+    "SELECT * FROM polls WHERE is_active=1 ORDER BY id DESC LIMIT 1";
+  const params = [];
+
+  if (pollId) {
+    pollQuery =
+      "SELECT * FROM polls WHERE id=? AND is_active=1 ORDER BY id DESC LIMIT 1";
+    params.push(pollId);
+  }
+
+  const [[poll]] = await pool.query(pollQuery, params);
   if (!poll) return null;
 
   const [opts] = await pool.query(
@@ -51,13 +59,32 @@ async function getActivePollWithOptions() {
   return poll;
 }
 
+async function deleteBlockedUser(chatId) {
+  try {
+    const [del] = await pool.query("DELETE FROM users WHERE tg_id=?", [chatId]);
+    if (del.affectedRows) {
+      return del.affectedRows;
+    }
+  } catch (err) {
+    if (err?.code === "ER_ROW_IS_REFERENCED_2" || err?.code === "ER_ROW_IS_REFERENCED") {
+      const [upd] = await pool.query(
+        "UPDATE users SET tg_id=NULL WHERE tg_id=?",
+        [chatId]
+      );
+      return upd.affectedRows || 0;
+    }
+    console.error("poll delete user error:", err?.message || err);
+  }
+  return 0;
+}
+
 /**
  * Aktiv so'rovnomani faqat hali ovoz bermagan foydalanuvchilarga yuboradi.
  * target = all | students | non_students
  */
-async function sendActivePollToUsers(bot) {
-  const poll = await getActivePollWithOptions();
-  if (!poll) return { sent: 0 };
+async function sendActivePollToUsers(bot, pollId = null) {
+  const poll = await getActivePollWithOptions(pollId);
+  if (!poll) return { sent: 0, removed: 0 };
 
   // Target filtri
   let targetFilter = '1=1';
@@ -80,12 +107,13 @@ async function sendActivePollToUsers(bot) {
     `,
     [poll.id]
   );
-  if (!rows.length) return { sent: 0 };
+  if (!rows.length) return { sent: 0, removed: 0 };
 
   const textHtml = composePollHtml(poll);
   const keyboard = Markup.inlineKeyboard(onePerRowButtons(poll.options, poll.id));
 
   let sent = 0;
+  let removed = 0;
   for (const r of rows) {
     const chatId = Number(r.tg_id);
     if (!chatId) continue;
@@ -100,12 +128,21 @@ async function sendActivePollToUsers(bot) {
     } catch (err) {
       // foydalanuvchi bloklagan/yaroqsiz chat — server to‘xtamasin
       const code = err?.response?.error_code;
-      if (![400, 401, 403].includes(code)) {
-        console.error('poll send error:', chatId, err?.description || err?.message || err);
+      const description = err?.response?.description || err?.description || err?.message;
+
+      if ([400, 401, 403, 410].includes(code)) {
+        const removedNow = await deleteBlockedUser(chatId);
+        if (removedNow) removed += removedNow;
+      } else {
+        console.error(
+          'poll send error:',
+          chatId,
+          description || err
+        );
       }
     }
   }
-  return { sent };
+  return { sent, removed };
 }
 
 module.exports = { getActivePollWithOptions, sendActivePollToUsers };

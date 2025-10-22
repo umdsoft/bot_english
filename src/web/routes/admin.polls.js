@@ -145,12 +145,16 @@ router.post("/new", ensureAuth, async (req, res) => {
       );
     }
 
+    if (Number(is_active)) {
+      await conn.query(`UPDATE polls SET is_active=0 WHERE id<>?`, [pollId]);
+    }
+
     await conn.commit();
 
     if (Number(is_active)) {
       try {
         const { bot } = require("../../index");
-        await sendActivePollToUsers(bot);
+        await sendActivePollToUsers(bot, pollId);
       } catch (e) {
         console.error("broadcast start error:", e?.message || e);
       }
@@ -178,19 +182,34 @@ router.post("/new", ensureAuth, async (req, res) => {
 
 // --- AKTIVLASH / DEAKTIVLASH ---
 router.post("/:id/activate", ensureAuth, async (req, res) => {
-  const id = Number(req.params.id);
-  await pool.query(`UPDATE polls SET is_active=1 WHERE id=?`, [id]);
   const pollId = Number(req.params.id);
+  if (!pollId) {
+    req.flash("error", "Noto‘g‘ri so‘rovnoma ID si.");
+    return res.redirect("/admin/polls");
+  }
+
+  await pool.query(`UPDATE polls SET is_active=0 WHERE id<>?`, [pollId]);
+  await pool.query(`UPDATE polls SET is_active=1 WHERE id=?`, [pollId]);
+
   // shu paytda darhol tarqatamiz
   try {
     const { bot } = require("../../index"); // bot instance (sizda qayerda export qilingan bo‘lsa)
-    const result = await sendActivePollToUsers(bot);
-    console.log(`Poll #${pollId} broadcast: sent=${result.sent}`);
+    const result = await sendActivePollToUsers(bot, pollId);
+    console.log(`Poll #${pollId} broadcast: sent=${result.sent}, removed=${result.removed}`);
+    const removedInfo = result.removed
+      ? ` ${result.removed} ta foydalanuvchi bloklagani uchun o‘chirildi.`
+      : "";
+    req.flash(
+      "msg",
+      result.sent
+        ? `So‘rovnoma aktivlashtirildi va ${result.sent} foydalanuvchiga yuborildi.${removedInfo}`
+        : `So‘rovnoma aktivlashtirildi.${removedInfo || " Foydalanuvchilarga yuborilmadi."}`
+    );
   } catch (e) {
     console.error("broadcast start error:", e?.message || e);
+    req.flash("error", "So‘rovnomani yuborishda xatolik yuz berdi.");
   }
 
-  req.flash("msg", "So‘rovnoma aktivlashtirildi.");
   res.redirect("/admin/polls");
 });
 // Create
@@ -225,30 +244,56 @@ router.post("/", ensureAuth, async (req, res) => {
 });
 
 router.post("/:id/deactivate", ensureAuth, async (req, res) => {
-  await pool.query("UPDATE polls SET is_active=0 WHERE id=?", [req.params.id]);
+  const pollId = Number(req.params.id);
+  if (!pollId) {
+    req.flash("error", "Noto‘g‘ri so‘rovnoma ID si.");
+    return res.redirect("/admin/polls");
+  }
+
+  await pool.query("UPDATE polls SET is_active=0 WHERE id=?", [pollId]);
   req.flash("msg", "So‘rovnoma deaktiv qilindi.");
   res.redirect("/admin/polls");
 });
 
 router.post("/:id/start", ensureAuth, async (req, res) => {
   const pollId = Number(req.params.id);
+  if (!pollId) {
+    req.flash("error", "Noto‘g‘ri so‘rovnoma ID si.");
+    return res.redirect("/admin/polls");
+  }
+
+  await pool.query("UPDATE polls SET is_active=0 WHERE id<>?", [pollId]);
   await pool.query("UPDATE polls SET is_active=1 WHERE id=?", [pollId]);
 
   // shu paytda darhol tarqatamiz
   try {
     const { bot } = require("../../index"); // bot instance (sizda qayerda export qilingan bo‘lsa)
-    const result = await sendActivePollToUsers(bot);
-    console.log(`Poll #${pollId} broadcast: sent=${result.sent}`);
+    const result = await sendActivePollToUsers(bot, pollId);
+    console.log(`Poll #${pollId} broadcast: sent=${result.sent}, removed=${result.removed}`);
+    const removedInfo = result.removed
+      ? ` ${result.removed} ta foydalanuvchi bloklagani uchun o‘chirildi.`
+      : "";
+    req.flash(
+      "msg",
+      result.sent
+        ? `So‘rovnoma aktiv qilindi va ${result.sent} foydalanuvchiga yuborildi.${removedInfo}`
+        : `So‘rovnoma aktiv qilindi.${removedInfo || " Foydalanuvchilarga yuborilmadi."}`
+    );
   } catch (e) {
     console.error("broadcast start error:", e?.message || e);
+    req.flash("error", "So‘rovnomani yuborishda xatolik yuz berdi.");
   }
 
-  req.flash("msg", "So‘rovnoma aktiv qilindi.");
   res.redirect("/admin/polls");
 });
 
 router.post("/:id/stop", ensureAuth, async (req, res) => {
   const pollId = Number(req.params.id);
+  if (!pollId) {
+    req.flash("error", "Noto‘g‘ri so‘rovnoma ID si.");
+    return res.redirect("/admin/polls");
+  }
+
   await pool.query("UPDATE polls SET is_active=0 WHERE id=?", [pollId]);
   req.flash("msg", "So‘rovnoma to‘xtatildi.");
   res.redirect("/admin/polls");
@@ -256,21 +301,31 @@ router.post("/:id/stop", ensureAuth, async (req, res) => {
 
 // PUBLISH: faqat qatnashmaganlarga yuborish
 router.post("/:id/publish", ensureAuth, async (req, res) => {
+  const pollId = Number(req.params.id);
+  if (!pollId) {
+    req.flash("error", "Noto‘g‘ri so‘rovnoma ID si.");
+    return res.redirect("/admin/polls");
+  }
+
   const { bot } = require("../../index"); // bot export qilingan bo‘lsin
-  const poll = await loadPollFull(Number(req.params.id));
+  const poll = await loadPollFull(pollId);
   if (!poll || !poll.is_active) {
     req.flash("error", "So‘rovnoma aktiv emas.");
     return res.redirect("/admin/polls");
   }
   try {
-    const { sent } = await sendActivePollToUsers(bot);
-    console.log(`[poll] published to ${sent} users (not-voted)`);
-    req.flash(
-      "msg",
+    const { sent, removed } = await sendActivePollToUsers(bot, pollId);
+    console.log(`[poll] #${pollId} published to ${sent} users (not-voted), removed=${removed}`);
+    const messages = [];
+    messages.push(
       sent
         ? `So‘rovnoma qatnashmagan ${sent} foydalanuvchiga yuborildi.`
         : "Qayta yuborish uchun foydalanuvchi topilmadi."
     );
+    if (removed) {
+      messages.push(`${removed} ta foydalanuvchi botni bloklagani uchun bazadan o‘chirildi.`);
+    }
+    req.flash("msg", messages.join(" "));
     return res.redirect(`/admin/polls`);
   } catch (e) {
     console.error("publish error:", e?.message || e);
