@@ -1,12 +1,6 @@
 <% layout('layout') -%>
 <h1 class="text-2xl font-semibold mb-5">So‘rovnomalar</h1>
 
-<% if (typeof flash !== 'undefined' && flash) { %>
-  <div class="mb-4 rounded-lg bg-emerald-50 text-emerald-800 px-4 py-2 text-sm">
-    <%= flash %>
-  </div>
-<% } %>
-
 <div class="mb-4">
   <a href="/admin/polls/new"
      class="inline-flex items-center rounded-lg border px-3 py-1.5 bg-white hover:bg-gray-50">
@@ -39,21 +33,27 @@
 
       <% (polls || []).forEach(p => { %>
         <tr class="hover:bg-gray-50">
-          <td class="px-4 py-2"><%= p.id %></td>
+          <td class="px-4 py-2 align-top"><%= p.id %></td>
 
           <td class="px-4 py-2">
-           <td class="px-4 py-2">
-  <div class="font-medium">
-    <a href="/admin/polls/<%= p.id %>" class="hover:underline"><%= p.title %></a>
-  </div>
-  <% if (p.description) { %>
-    <div class="text-sm text-gray-500 truncate max-w-[520px]"><%= p.description %></div>
-  <% } %>
-</td>
+            <div class="font-medium">
+              <a href="/admin/polls/<%= p.id %>" class="hover:underline"><%= p.title %></a>
+            </div>
+            <% if (p.description) { %>
+              <div class="text-sm text-gray-500 truncate max-w-[520px]"><%= p.description %></div>
+            <% } %>
           </td>
 
-          <td class="px-4 py-2"><%= p.target || 'all' %></td>
-          <td class="px-4 py-2"><%= p.is_multi ? '✅' : '—' %></td>
+          <td class="px-4 py-2 text-sm text-gray-600">
+            <% if ((p.target || 'all') === 'students') { %>
+              Faqat o‘quvchilar
+            <% } else if ((p.target || 'all') === 'non_students') { %>
+              Faqat mehmonlar
+            <% } else { %>
+              Barchaga
+            <% } %>
+          </td>
+          <td class="px-4 py-2 text-center"><%= p.is_multi ? '✅' : '—' %></td>
 
           <td class="px-4 py-2">
             <% if (p.is_active) { %>

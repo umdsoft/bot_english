@@ -1,35 +1,163 @@
-<div>
-  <label class="block text-sm text-gray-600 mb-1">Tavsif (ixtiyoriy)</label>
+<% layout('layout') -%>
+<%
+  const oldData = old || {};
+  const optionValues = Array.isArray(oldData.options) && oldData.options.length
+    ? oldData.options
+    : ["", ""];
+  while (optionValues.length < 2) optionValues.push("");
+%>
 
-  <!-- mini-toolbar -->
-  <div class="flex items-center gap-2 text-sm text-gray-600 mb-2">
-    <span class="mr-2">Formatlash:</span>
-    <button type="button" data-ins="bold"   class="px-2 py-0.5 rounded border">B</button>
-    <button type="button" data-ins="italic" class="px-2 py-0.5 rounded border italic">I</button>
-    <button type="button" data-ins="underline" class="px-2 py-0.5 rounded border">U</button>
-    <button type="button" data-ins="strike" class="px-2 py-0.5 rounded border line-through">S</button>
-    <button type="button" data-ins="link"   class="px-2 py-0.5 rounded border">Link</button>
-    <button type="button" data-ins="br"     class="px-2 py-0.5 rounded border">↵</button>
-    <span class="ml-auto text-xs text-gray-500">
-      Qo’llab-quvvatlanadi: <code>&lt;b&gt; &lt;i&gt; &lt;u&gt; &lt;s&gt; &lt;a&gt; &lt;br&gt;</code>
-    </span>
-  </div>
-
-  <textarea id="desc" name="description"
-            class="w-full rounded border px-3 py-2 font-[system-ui] leading-6"
-            rows="6"
-            placeholder="Masalan:
-<b>🔥 E’lon!</b><br>
-Bugun soat 18:00 da yig‘ilish bo‘ladi.<br><br>
-<i>Manzil:</i> Chilonzor...">
-  </textarea>
-
-  <!-- Telegramga o‘xshash jonli ko‘rish -->
-  <div class="mt-3">
-    <div class="text-sm text-gray-500 mb-1">Telegramda qanday ko‘rinadi (preview):</div>
-    <div id="tgPreview" class="rounded-xl border p-3 bg-white text-[15px] leading-6"></div>
-  </div>
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-semibold">Yangi so‘rovnoma</h1>
+  <a href="/admin/polls" class="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
+    ⬅ Orqaga
+  </a>
 </div>
+
+<form method="post" action="/admin/polls/new" class="grid gap-6 lg:grid-cols-3">
+  <!-- Asosiy ma'lumotlar -->
+  <div class="lg:col-span-2 space-y-6">
+    <div class="rounded-xl border bg-white p-5 space-y-4">
+      <div>
+        <label for="title" class="block text-sm text-gray-600 mb-1">Sarlavha</label>
+        <input
+          id="title"
+          name="title"
+          type="text"
+          required
+          value="<%= oldData.title || '' %>"
+          class="w-full rounded border px-3 py-2"
+          placeholder="Masalan: O‘quvchilar uchun yangi dars jadvali"
+        />
+      </div>
+
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">Tavsif (ixtiyoriy)</label>
+
+        <!-- mini-toolbar -->
+        <div class="flex items-center gap-2 text-sm text-gray-600 mb-2">
+          <span class="mr-2">Formatlash:</span>
+          <button type="button" data-ins="bold"   class="px-2 py-0.5 rounded border">B</button>
+          <button type="button" data-ins="italic" class="px-2 py-0.5 rounded border italic">I</button>
+          <button type="button" data-ins="underline" class="px-2 py-0.5 rounded border">U</button>
+          <button type="button" data-ins="strike" class="px-2 py-0.5 rounded border line-through">S</button>
+          <button type="button" data-ins="link"   class="px-2 py-0.5 rounded border">Link</button>
+          <button type="button" data-ins="br"     class="px-2 py-0.5 rounded border">↵</button>
+          <span class="ml-auto text-xs text-gray-500">
+            Qo’llab-quvvatlanadi: <code>&lt;b&gt; &lt;i&gt; &lt;u&gt; &lt;s&gt; &lt;a&gt; &lt;br&gt;</code>
+          </span>
+        </div>
+
+        <textarea
+          id="desc"
+          name="description"
+          class="w-full rounded border px-3 py-2 font-[system-ui] leading-6"
+          rows="6"
+          placeholder="Masalan:\n<b>🔥 E’lon!</b><br>\nBugun soat 18:00 da yig‘ilish bo‘ladi.<br><br>\n<i>Manzil:</i> Chilonzor..."
+        ><%= oldData.description || '' %></textarea>
+
+        <!-- Telegramga o‘xshash jonli ko‘rish -->
+        <div class="mt-3">
+          <div class="text-sm text-gray-500 mb-1">Telegramda qanday ko‘rinadi (preview):</div>
+          <div id="tgPreview" class="rounded-xl border p-3 bg-white text-[15px] leading-6"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rounded-xl border bg-white p-5">
+      <div class="flex items-center justify-between mb-4">
+        <div class="text-sm text-gray-500 uppercase">Variantlar</div>
+        <button type="button" id="addOption" class="text-sm text-blue-600 hover:underline">➕ Variant qo‘shish</button>
+      </div>
+
+      <div id="optionsWrap" class="space-y-2">
+        <% optionValues.forEach((val, idx) => { %>
+          <div class="flex gap-2 option-row">
+            <input
+              type="text"
+              name="options[]"
+              value="<%= val %>"
+              required
+              class="flex-1 rounded border px-3 py-2"
+              placeholder="Variant <%= idx + 1 %>"
+            />
+            <button type="button" class="removeOption px-3 py-2 border rounded text-sm text-gray-500 hover:text-rose-600">🗑</button>
+          </div>
+        <% }) %>
+      </div>
+      <p class="mt-3 text-xs text-gray-500">Kamida 2 ta variant bo‘lishi shart.</p>
+    </div>
+  </div>
+
+  <!-- Sozlamalar -->
+  <div class="space-y-6">
+    <div class="rounded-xl border bg-white p-5 space-y-4">
+      <div>
+        <label for="target" class="block text-sm text-gray-600 mb-1">Kimlarga yuboriladi?</label>
+        <select id="target" name="target" class="w-full rounded border px-3 py-2 text-sm">
+          <option value="all" <%= (!oldData.target || oldData.target === 'all') ? 'selected' : '' %>>Barcha foydalanuvchilarga</option>
+          <option value="students" <%= oldData.target === 'students' ? 'selected' : '' %>>Faqat o‘quvchilarga</option>
+          <option value="non_students" <%= oldData.target === 'non_students' ? 'selected' : '' %>>Faqat mehmonlarga</option>
+        </select>
+      </div>
+
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="is_multi" value="1" <%= oldData.is_multi ? 'checked' : '' %> />
+        Bir nechta variantni belgilashga ruxsat berish
+      </label>
+
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="is_active" value="1" <%= oldData.is_active ? 'checked' : '' %> />
+        Darhol aktivlashtirish va tarqatish
+      </label>
+    </div>
+
+    <div class="rounded-xl border bg-white p-5">
+      <button type="submit" class="w-full rounded-lg bg-emerald-600 text-white px-4 py-2 font-semibold">
+        Saqlash
+      </button>
+    </div>
+  </div>
+</form>
+
+<script>
+  (function() {
+    const wrap = document.getElementById('optionsWrap');
+    const addBtn = document.getElementById('addOption');
+
+    function updateRemoveState() {
+      const rows = wrap.querySelectorAll('.option-row');
+      rows.forEach(btnRow => {
+        const btn = btnRow.querySelector('.removeOption');
+        btn.disabled = rows.length <= 2;
+        btn.classList.toggle('opacity-40', rows.length <= 2);
+      });
+    }
+
+    addBtn.addEventListener('click', () => {
+      const count = wrap.querySelectorAll('.option-row').length;
+      const row = document.createElement('div');
+      row.className = 'flex gap-2 option-row';
+      row.innerHTML = `
+        <input type="text" name="options[]" class="flex-1 rounded border px-3 py-2" placeholder="Variant ${count + 1}" required />
+        <button type="button" class="removeOption px-3 py-2 border rounded text-sm text-gray-500 hover:text-rose-600">🗑</button>
+      `;
+      wrap.appendChild(row);
+      updateRemoveState();
+    });
+
+    wrap.addEventListener('click', (e) => {
+      if (e.target.classList.contains('removeOption')) {
+        const rows = wrap.querySelectorAll('.option-row');
+        if (rows.length <= 2) return;
+        e.target.closest('.option-row').remove();
+        updateRemoveState();
+      }
+    });
+
+    updateRemoveState();
+  })();
+</script>
 
 <script>
   // --- kichik yordamchilar ---

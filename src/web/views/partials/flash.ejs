@@ -1,6 +1,12 @@
-<% if (msg && msg.length) { %>
-  <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 px-4 py-3">✅ <%= msg %></div>
-<% } %>
-<% if (error && error.length) { %>
-  <div class="mb-4 rounded-lg border border-rose-200 bg-rose-50 text-rose-800 px-4 py-3">❌ <%= error %></div>
-<% } %>
+<%
+  const successMessages = Array.isArray(msg) ? msg : (msg ? [msg] : []);
+  const errorMessages = Array.isArray(error) ? error : (error ? [error] : []);
+%>
+
+<% successMessages.forEach(m => { if (!m) return; %>
+  <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 px-4 py-3">✅ <%= m %></div>
+<% }) %>
+
+<% errorMessages.forEach(e => { if (!e) return; %>
+  <div class="mb-4 rounded-lg border border-rose-200 bg-rose-50 text-rose-800 px-4 py-3">❌ <%= e %></div>
+<% }) %>

@@ -46,12 +46,13 @@
           >
             <span>📚 Kurslar</span>
           </a>
-            <a href="/admin/polls"
-     class="flex items-center gap-2 px-3 py-2 rounded-lg
-            <%= cur.startsWith('/admin/polls') ? 'bg-gray-900 text-white' : 'hover:bg-gray-100' %>">
-    <span>🗳️</span>
-    <span>So‘rovnomalar</span>
-  </a>
+          <a
+            href="/admin/polls"
+            class="flex items-center gap-2 px-3 py-2 rounded-lg <%= (cur && cur.startsWith('/admin/polls')) ? 'bg-gray-900 text-white' : 'hover:bg-gray-100' %>"
+          >
+            <span>🗳️</span>
+            <span>So‘rovnomalar</span>
+          </a>
           <a
             href="/admin/leads"
             class="flex items-center gap-3 px-3 py-2 rounded-lg <%= (_path.startsWith('/admin/leads')) ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100' %>"
