@@ -1,5 +1,5 @@
 // src/services/leads.js
-const { pool } = require("../db");
+const { query } = require("../db");
 
 // --- kataloglar (o'zgarmagan) ---
 const REASONS = [
@@ -102,7 +102,7 @@ async function saveLead({
   ];
 
   try {
-    const [res] = await pool.query(sql, params);
+    const [res] = await query(sql, params);
     return res.insertId; // id ni qaytaramiz
   } catch (e) {
     // FK/CK xatolarini aniqroq qilish

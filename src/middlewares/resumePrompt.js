@@ -1,23 +1,33 @@
-const { pool } = require("../db");
-const { Markup } = require("telegraf");
+const { query } = require("../db");
+const { safeReply } = require("../bot/helpers/telegram");
 
 async function resumePrompt(ctx, next) {
   try {
-    if (ctx.updateType === "callback_query" || ctx.message?.contact) return next();
-    const tgId = ctx.from.id;
-    const [[u]] = await pool.query("SELECT id FROM users WHERE tg_id=?", [tgId]);
-    if (!u) return next();
-    const [[att]] = await pool.query(
+    const tgId = ctx.from?.id;
+    if (!tgId) {
+      return next();
+    }
+
+    const [[user]] = await query("SELECT id FROM users WHERE tg_id=?", [tgId]);
+    if (!user) {
+      return next();
+    }
+
+    const [[attempt]] = await query(
       "SELECT id FROM attempts WHERE user_id=? AND status='started' ORDER BY id DESC LIMIT 1",
-      [u.id]
+      [user.id]
     );
-    if (att) {
-      await ctx.reply(
-        "Sizda tugallanmagan test bor. Davom ettirasizmi?",
-        Markup.inlineKeyboard([Markup.button.callback("▶️ Davom ettirish", `resume:${att.id}`)])
+
+    if (attempt) {
+      await safeReply(
+        ctx,
+        "⏳ Sizda yakunlanmagan test mavjud. Davom ettirish uchun menyudan foydalaning."
       );
     }
-  } catch {}
+  } catch (error) {
+    // middleware xatoliklari umumiy oqimni to‘xtatmasin
+  }
+
   return next();
 }
 
