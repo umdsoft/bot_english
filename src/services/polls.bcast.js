@@ -127,19 +127,25 @@ async function sendActivePollToUsers(bot, pollId = null) {
       sent++;
     } catch (err) {
       // foydalanuvchi bloklagan/yaroqsiz chat — server to‘xtamasin
-      const code = err?.response?.error_code;
+      const code = err?.response?.error_code ?? err?.code;
       const description = err?.response?.description || err?.description || err?.message;
 
-      if ([400, 401, 403, 410].includes(code)) {
+      if ([400, 401, 403, 410].includes(code) || /blocked/i.test(description || '')) {
+        console.warn(
+          'poll send blocked:',
+          chatId,
+          { code, description }
+        );
         const removedNow = await deleteBlockedUser(chatId);
         if (removedNow) removed += removedNow;
-      } else {
-        console.error(
-          'poll send error:',
-          chatId,
-          description || err
-        );
+        continue;
       }
+
+      console.error(
+        'poll send error:',
+        chatId,
+        { code, description }
+      );
     }
   }
   return { sent, removed };
