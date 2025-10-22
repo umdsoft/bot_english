@@ -1,4 +1,3 @@
-require("dotenv").config();
 const path = require("path");
 const express = require("express");
 const session = require("express-session");
@@ -6,6 +5,7 @@ const flash = require("connect-flash");
 const engine = require("ejs-mate");
 const adminRoutes = require("./routes/admin");
 const morgan = require('morgan');
+const { config } = require("../config");
 const app = express();
 
 // EJS
@@ -28,7 +28,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(
   session({
-    secret: process.env.ADMIN_SESSION_SECRET || "supersecret_session_key",
+    secret: config.admin.sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: { maxAge: 1000 * 60 * 60 * 8 }, // 8 soat

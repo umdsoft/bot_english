@@ -1,28 +1,21 @@
 // src/handlers/leads.js
 const { Markup } = require("telegraf");
-const { pool } = require("../db");
+const { query } = require("../db");
 const { saveLead, REASONS, DISTRICTS, GROUPS, TIME_SLOTS, DAYS_PREF } = require("../services/leads");
 const { TARGET_CHANNEL_ID } = require("../config");
+const { safeReply, safeAnswerCallback } = require("../bot/helpers/telegram");
+const { createLogger } = require("../core/logger");
 
-const leadState = new Map(); // tg_id -> { step, data:{} }
+const logger = createLogger("handlers:leads");
 
-// --- helpers: fast ack & safe reply ---
-function fastAck(ctx, text) {
-  // callback_query 15s limitini buzmaslik uchun darhol ACK
-  return ctx.answerCbQuery(text).catch(() => {});
-}
-function safeReply(ctx, text, extra) {
-  return ctx.reply(text, extra).catch(() => null);
-}
+const leadState = new Map();
 
 function registerLead(bot) {
-  // Funnel tugmalari testdan keyin yuboriladi (testFlow ichida), lekin handlerlar bu yerda
   bot.on("callback_query", async (ctx, next) => {
     const data = ctx.callbackQuery?.data || "";
 
-    // --- Batafsil info
     if (data === "lead:info") {
-      fastAck(ctx);
+      safeAnswerCallback(ctx);
       return safeReply(
         ctx,
         "Kurslarimiz bo‘yicha batafsil ma’lumot: \n" +
@@ -32,107 +25,103 @@ function registerLead(bot) {
       );
     }
 
-    // --- Funnelni boshlash
     if (data === "lead:start") {
-      fastAck(ctx);
+      safeAnswerCallback(ctx);
       const tgId = ctx.from.id;
       leadState.set(tgId, { step: "reason", data: {} });
       return safeReply(
         ctx,
         "Ingliz tilini **nima uchun** o‘rganmoqchisiz?",
         Markup.inlineKeyboard(
-          REASONS.map((r) => [Markup.button.callback(r.label, `lead:reason:${r.code}`)])
+          REASONS.map((reason) => [
+            Markup.button.callback(reason.label, `lead:reason:${reason.code}`),
+          ])
         )
       );
     }
 
-    // --- Sabab tanlandi
     if (data.startsWith("lead:reason:")) {
-      fastAck(ctx);
+      safeAnswerCallback(ctx);
       const code = data.split(":")[2];
       const tgId = ctx.from.id;
-      const st = leadState.get(tgId) || { data: {} };
-      st.step = "district";
-      st.data.reason = code;
-      leadState.set(tgId, st);
+      const state = leadState.get(tgId) || { data: {} };
+      state.step = "district";
+      state.data.reason = code;
+      leadState.set(tgId, state);
 
       const rows = [];
       for (let i = 0; i < DISTRICTS.length; i += 2) {
         rows.push(
-          DISTRICTS.slice(i, i + 2).map((d) =>
-            Markup.button.callback(d, `lead:district:${d}`)
+          DISTRICTS.slice(i, i + 2).map((district) =>
+            Markup.button.callback(district, `lead:district:${district}`)
           )
         );
       }
       return safeReply(ctx, "Qaysi tumanda yashaysiz?", Markup.inlineKeyboard(rows));
     }
 
-    // --- Tuman tanlandi
     if (data.startsWith("lead:district:")) {
-      fastAck(ctx);
-      const name = data.split(":").slice(2).join(":"); // tuman
+      safeAnswerCallback(ctx);
+      const name = data.split(":").slice(2).join(":");
       const tgId = ctx.from.id;
-      const st = leadState.get(tgId) || { data: {} };
-      st.step = "group";
-      st.data.district = name;
-      leadState.set(tgId, st);
+      const state = leadState.get(tgId) || { data: {} };
+      state.step = "group";
+      state.data.district = name;
+      leadState.set(tgId, state);
 
       return safeReply(
         ctx,
         "Qaysi **guruh**da o‘qishni xohlaysiz?",
         Markup.inlineKeyboard(
-          GROUPS.map((g) => [Markup.button.callback(g, `lead:group:${g}`)])
+          GROUPS.map((group) => [Markup.button.callback(group, `lead:group:${group}`)])
         )
       );
     }
 
-    // --- Guruh tanlandi
     if (data.startsWith("lead:group:")) {
-      fastAck(ctx);
+      safeAnswerCallback(ctx);
       const group = data.split(":").slice(2).join(":");
       const tgId = ctx.from.id;
-      const st = leadState.get(tgId) || { data: {} };
-      st.step = "time";
-      st.data.group = group;
-      leadState.set(tgId, st);
+      const state = leadState.get(tgId) || { data: {} };
+      state.step = "time";
+      state.data.group = group;
+      leadState.set(tgId, state);
 
       return safeReply(
         ctx,
         "Qaysi **vaqtlar** sizga qulay?",
         Markup.inlineKeyboard(
-          TIME_SLOTS.map((t) => [Markup.button.callback(t, `lead:time:${t}`)])
+          TIME_SLOTS.map((slot) => [Markup.button.callback(slot, `lead:time:${slot}`)])
         )
       );
     }
 
-    // --- Vaqt tanlandi
     if (data.startsWith("lead:time:")) {
-      fastAck(ctx);
+      safeAnswerCallback(ctx);
       const slot = data.split(":").slice(2).join(":");
       const tgId = ctx.from.id;
-      const st = leadState.get(tgId) || { data: {} };
-      st.step = "days";
-      st.data.time_slot = slot;
-      leadState.set(tgId, st);
+      const state = leadState.get(tgId) || { data: {} };
+      state.step = "days";
+      state.data.time_slot = slot;
+      leadState.set(tgId, state);
 
       return safeReply(
         ctx,
         "Qaysi **kunlar** sizga qulay?",
         Markup.inlineKeyboard(
-          DAYS_PREF.map((d) => [Markup.button.callback(d.label, `lead:days:${d.code}`)])
+          DAYS_PREF.map((day) => [Markup.button.callback(day.label, `lead:days:${day.code}`)])
         )
       );
     }
 
-    // --- Kunlar tanlandi -> telefon bosqichi
     if (data.startsWith("lead:days:")) {
-      fastAck(ctx);
+      safeAnswerCallback(ctx);
       const code = data.split(":")[2];
       const tgId = ctx.from.id;
-      const st = leadState.get(tgId) || { data: {} };
-      st.step = "phone";
-      st.data.days_pref = code;
-      leadState.set(tgId, st);
+      const state = leadState.get(tgId) || { data: {} };
+      state.step = "phone";
+      state.data.days_pref = code;
+      leadState.set(tgId, state);
 
       return safeReply(
         ctx,
@@ -143,11 +132,12 @@ function registerLead(bot) {
     return next();
   });
 
-  // --- Telefonni qabul qilish
   bot.on("text", async (ctx, next) => {
     const tgId = ctx.from.id;
-    const st = leadState.get(tgId);
-    if (!st || st.step !== "phone") return next();
+    const state = leadState.get(tgId);
+    if (!state || state.step !== "phone") {
+      return next();
+    }
 
     const raw = (ctx.message.text || "").trim();
     const digits = raw.replace(/[^\d+]/g, "");
@@ -155,19 +145,20 @@ function registerLead(bot) {
       return safeReply(ctx, "Iltimos, raqamni to‘g‘ri kiriting (masalan, +998901234567).");
     }
 
-    st.data.phone = digits;
-    st.step = "done";
-    leadState.set(tgId, st);
+    state.data.phone = digits;
+    state.step = "done";
+    leadState.set(tgId, state);
 
     try {
-      const [[u]] = await pool.query(
+      const [[user]] = await query(
         "SELECT id, full_name, username, phone FROM users WHERE tg_id=?",
         [tgId]
       );
-      const data = st.data;
+
+      const data = state.data;
 
       await saveLead({
-        userId: u?.id || null,
+        userId: user?.id || null,
         tgId,
         phone: data.phone,
         reason: data.reason || null,
@@ -183,28 +174,30 @@ function registerLead(bot) {
           "Tez orada menejerlarimiz siz bilan bog‘lanadi."
       );
 
-      // admin kanaliga xabar (xatoni yutamiz)
-      const reasonLabel = (REASONS.find((r) => r.code === data.reason) || {}).label || data.reason;
-      const daysLabel = (DAYS_PREF.find((d) => d.code === data.days_pref) || {}).label || data.days_pref;
+      const reasonLabel = (REASONS.find((item) => item.code === data.reason) || {}).label || data.reason;
+      const daysLabel = (DAYS_PREF.find((item) => item.code === data.days_pref) || {}).label || data.days_pref;
 
       await ctx.telegram
         .sendMessage(
           TARGET_CHANNEL_ID,
           "🆕 Yangi lead:\n" +
-            `👤 ${u?.full_name || "-"} ${ctx.from.username ? "(@" + ctx.from.username + ")" : ""}\n` +
+            `👤 ${user?.full_name || "-"} ${ctx.from.username ? "(@" + ctx.from.username + ")" : ""}\n` +
             `📞 ${data.phone}\n` +
             `🎯 Sabab: ${reasonLabel}\n` +
             `📍 Tuman: ${data.district}\n` +
             `🏷 Guruh: ${data.group}\n` +
             `⏰ Vaqt: ${data.time_slot}\n` +
-            `📅 Kunlar: ${daysLabel}\n` +
-            `💸 Taklif: 10% chegirma`
+            `📅 Kunlar: ${daysLabel}\n`
         )
-        .catch(() => {});
-
-    } catch (e) {
-      console.error("Lead save error:", e?.message || e);
-      await safeReply(ctx, "Kutilmagan xatolik. Iltimos, keyinroq urinib ko‘ring.");
+        .catch((error) => {
+          logger.warn("Failed to notify target channel", { message: error?.message });
+        });
+    } catch (error) {
+      logger.error("Failed to process lead", { message: error?.message });
+      await safeReply(
+        ctx,
+        "Kutilmagan xatolik yuz berdi. Iltimos, keyinroq qayta urinib ko‘ring."
+      );
     } finally {
       leadState.delete(tgId);
     }
