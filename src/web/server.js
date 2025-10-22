@@ -37,16 +37,14 @@ app.use(
 app.use(flash());
 app.use((req, res, next) => {
   res.locals.title = "Admin";
-  res.locals.error = req.flash("error");
-  res.locals.msg = req.flash("msg");
   res.locals.path = req.originalUrl || req.path || ""; // ← active menu uchun
   next();
 });
 app.use((req, res, next) => {
-  const m = req.flash("msg");
-  res.locals.msg = m && m.length ? m : null;
-  const e = req.flash("error");
-  res.locals.error = e && e.length ? e : null;
+  const messages = req.flash("msg");
+  res.locals.msg = messages && messages.length ? messages : null;
+  const errors = req.flash("error");
+  res.locals.error = errors && errors.length ? errors : null;
   next();
 });
 // static (logo va h.k.)

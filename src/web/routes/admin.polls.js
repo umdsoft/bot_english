@@ -2,13 +2,12 @@ const express = require("express");
 const router = express.Router();
 const { pool } = require("../../db");
 const { ensureAuth } = require("../middleware/auth");
-const { publishPoll } = require("../../services/polls.bcast");
 const { loadPollFull } = require("../../handlers/polls");
 const { sendActivePollToUsers } = require("../../services/polls.bcast");
 // List
 router.get("/", ensureAuth, async (req, res) => {
   const [polls] = await pool.query(`
-    SELECT p.*,
+    SELECT p.*, p.body AS description,
       (SELECT COUNT(*) FROM poll_votes v WHERE v.poll_id=p.id) AS votes
     FROM polls p
     ORDER BY p.id DESC
@@ -16,13 +15,13 @@ router.get("/", ensureAuth, async (req, res) => {
   res.render("polls_list", {
     user: req.session.adminUser,
     polls,
-    flash: req.query.flash,
   });
 });
 
 // New form
 router.get("/new", ensureAuth, (req, res) => {
-  res.render("polls_new", { user: req.session.adminUser });
+  const [old] = req.flash("poll_old");
+  res.render("polls_new", { user: req.session.adminUser, old: old || null });
 });
 router.get("/:id", ensureAuth, async (req, res) => {
   const pollId = Number(req.params.id || 0);
@@ -109,7 +108,15 @@ router.post("/new", ensureAuth, async (req, res) => {
 
   const opts = options.map((o) => String(o || "").trim()).filter(Boolean);
   if (!title || opts.length < 2) {
-    flash(req, "Xatolik: sarlavha va kamida 2 ta variant shart.");
+    req.flash("error", "Xatolik: sarlavha va kamida 2 ta variant shart.");
+    req.flash("poll_old", {
+      title,
+      description,
+      target,
+      is_multi: Number(is_multi) ? 1 : 0,
+      is_active: Number(is_active) ? 1 : 0,
+      options: opts,
+    });
     return res.redirect("/admin/polls/new");
   }
 
@@ -139,12 +146,30 @@ router.post("/new", ensureAuth, async (req, res) => {
     }
 
     await conn.commit();
-    // flash(req, 'So‘rovnoma yaratildi.');
+
+    if (Number(is_active)) {
+      try {
+        const { bot } = require("../../index");
+        await sendActivePollToUsers(bot);
+      } catch (e) {
+        console.error("broadcast start error:", e?.message || e);
+      }
+    }
+
+    req.flash("msg", "So‘rovnoma yaratildi.");
     res.redirect("/admin/polls");
   } catch (e) {
     await conn.rollback();
     console.error("create poll error:", e);
-    // flash(req, 'Xatolik: so‘rovnoma yaratilmadi.');
+    req.flash("error", "Xatolik: so‘rovnoma yaratilmadi.");
+    req.flash("poll_old", {
+      title,
+      description,
+      target,
+      is_multi: Number(is_multi) ? 1 : 0,
+      is_active: Number(is_active) ? 1 : 0,
+      options: opts,
+    });
     res.redirect("/admin/polls/new");
   } finally {
     conn.release();
@@ -165,7 +190,7 @@ router.post("/:id/activate", ensureAuth, async (req, res) => {
     console.error("broadcast start error:", e?.message || e);
   }
 
-  flash(req, "So‘rovnoma aktivlashtirildi.");
+  req.flash("msg", "So‘rovnoma aktivlashtirildi.");
   res.redirect("/admin/polls");
 });
 // Create
@@ -201,7 +226,8 @@ router.post("/", ensureAuth, async (req, res) => {
 
 router.post("/:id/deactivate", ensureAuth, async (req, res) => {
   await pool.query("UPDATE polls SET is_active=0 WHERE id=?", [req.params.id]);
-  res.redirect("/admin/polls?flash=deactivated");
+  req.flash("msg", "So‘rovnoma deaktiv qilindi.");
+  res.redirect("/admin/polls");
 });
 
 router.post("/:id/start", ensureAuth, async (req, res) => {
@@ -217,12 +243,14 @@ router.post("/:id/start", ensureAuth, async (req, res) => {
     console.error("broadcast start error:", e?.message || e);
   }
 
+  req.flash("msg", "So‘rovnoma aktiv qilindi.");
   res.redirect("/admin/polls");
 });
 
 router.post("/:id/stop", ensureAuth, async (req, res) => {
   const pollId = Number(req.params.id);
   await pool.query("UPDATE polls SET is_active=0 WHERE id=?", [pollId]);
+  req.flash("msg", "So‘rovnoma to‘xtatildi.");
   res.redirect("/admin/polls");
 });
 
@@ -231,15 +259,23 @@ router.post("/:id/publish", ensureAuth, async (req, res) => {
   const { bot } = require("../../index"); // bot export qilingan bo‘lsin
   const poll = await loadPollFull(Number(req.params.id));
   if (!poll || !poll.is_active) {
-    return res.redirect("/admin/polls?flash=notactive");
+    req.flash("error", "So‘rovnoma aktiv emas.");
+    return res.redirect("/admin/polls");
   }
   try {
-    const sent = await sendActivePollToUsers(bot, poll);
+    const { sent } = await sendActivePollToUsers(bot);
     console.log(`[poll] published to ${sent} users (not-voted)`);
-    return res.redirect(`/admin/polls?flash=sent:${sent}`);
+    req.flash(
+      "msg",
+      sent
+        ? `So‘rovnoma qatnashmagan ${sent} foydalanuvchiga yuborildi.`
+        : "Qayta yuborish uchun foydalanuvchi topilmadi."
+    );
+    return res.redirect(`/admin/polls`);
   } catch (e) {
     console.error("publish error:", e?.message || e);
-    return res.redirect("/admin/polls?flash=error");
+    req.flash("error", "So‘rovnomani yuborishda xatolik yuz berdi.");
+    return res.redirect("/admin/polls");
   }
 });
 
