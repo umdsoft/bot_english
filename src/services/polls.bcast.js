@@ -59,23 +59,34 @@ async function getActivePollWithOptions(pollId = null) {
   return poll;
 }
 
-async function deleteBlockedUser(chatId) {
+async function markUserBlocked(chatId) {
   try {
-    const [del] = await pool.query("DELETE FROM users WHERE tg_id=?", [chatId]);
-    if (del.affectedRows) {
-      return del.affectedRows;
-    }
-  } catch (err) {
-    if (err?.code === "ER_ROW_IS_REFERENCED_2" || err?.code === "ER_ROW_IS_REFERENCED") {
-      const [upd] = await pool.query(
-        "UPDATE users SET tg_id=NULL WHERE tg_id=?",
+    // Foydalanuvchini butunlay o'chirish o'rniga faqat telegram ID ni tozalaymiz
+    // va mavjud bo'lsa bloklanganligini belgilaymiz.
+    let affected = 0;
+
+    try {
+      const [markBlocked] = await pool.query(
+        "UPDATE users SET is_blocked=1 WHERE tg_id=?",
         [chatId]
       );
-      return upd.affectedRows || 0;
+      if (markBlocked.affectedRows) affected = 1;
+    } catch (err) {
+      // is_blocked ustuni bo'lmagan holatlarda jim o'tamiz
+      if (err?.code !== "ER_BAD_FIELD_ERROR") throw err;
     }
-    console.error("poll delete user error:", err?.message || err);
+
+    const [clearTgId] = await pool.query(
+      "UPDATE users SET tg_id=NULL WHERE tg_id=?",
+      [chatId]
+    );
+    if (clearTgId.affectedRows) affected = 1;
+
+    return affected;
+  } catch (err) {
+    console.error("poll mark user blocked error:", err?.message || err);
+    return 0;
   }
-  return 0;
 }
 
 /**
@@ -136,7 +147,7 @@ async function sendActivePollToUsers(bot, pollId = null) {
           chatId,
           { code, description }
         );
-        const removedNow = await deleteBlockedUser(chatId);
+        const removedNow = await markUserBlocked(chatId);
         if (removedNow) removed += removedNow;
         continue;
       }
